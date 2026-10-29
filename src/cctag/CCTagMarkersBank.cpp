@@ -8,7 +8,6 @@
 #include <cctag/CCTagMarkersBank.hpp>
 #include <cctag/utils/Defines.hpp>
 
-#include <boost/numeric/conversion/bounds.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_stl.hpp>
@@ -18,6 +17,8 @@
 #include <fstream>
 #include <vector>
 #include <ios>
+#include <iterator>
+#include <limits>
 
 namespace cctag
 {
@@ -46,32 +47,21 @@ bool cctagLineParse(std::string::const_iterator first,
 
 CCTagMarkersBank::CCTagMarkersBank( std::size_t nCrowns )
 {
-  _markers.clear();
   if ( nCrowns == 3 )
   {
+    _markers.reserve(32);
     for(const auto & idThreeCrown : CCTagMarkersBank::idThreeCrowns)
     {
-      std::vector<float> line;
-      line.reserve(5);
-      for(float j : idThreeCrown)
-      {
-        line.push_back(j);
-      }
-      _markers.push_back(line);
+      _markers.emplace_back(std::begin(idThreeCrown), std::end(idThreeCrown));
     }
     
   }
   else if ( nCrowns == 4 )
   {
+    _markers.reserve(128);
     for(const auto & idFourCrown : CCTagMarkersBank::idFourCrowns)
     {
-      std::vector<float> line;
-      line.reserve(7);
-      for(float j : idFourCrown)
-      {
-        line.push_back(j);
-      }
-      _markers.push_back(line);
+      _markers.emplace_back(std::begin(idFourCrown), std::end(idFourCrown));
     }
   }
 }
@@ -107,7 +97,7 @@ std::size_t CCTagMarkersBank::identify( const std::vector<float> & marker ) cons
   std::vector< std::vector<float> >::const_iterator itm = _markers.begin();
 
   std::size_t imin = 0;
-  float normMin = boost::numeric::bounds<float>::highest();
+  float normMin = std::numeric_limits<float>::max();
   std::size_t i = 0;
 
   while( itm != _markers.end() )
