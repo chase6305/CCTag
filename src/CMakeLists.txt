@@ -177,7 +177,6 @@ if(CCTAG_WITH_CUDA)
                        Boost::date_time 
                        Boost::serialization 
                        Boost::filesystem 
-                       Boost::timer
                        Eigen3::Eigen
                        TBB::tbb
                        ${CUDA_CUDADEVRT_LIBRARY})
@@ -225,7 +224,6 @@ else() # without CUDA
                           Boost::date_time
                           Boost::filesystem
                           Boost::serialization 
-                          Boost::timer
                         PRIVATE
                           TBB::tbb)
 

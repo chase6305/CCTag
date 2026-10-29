@@ -39,7 +39,7 @@ else()
 endif()
 
 # BOOST
-find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options QUIET)
+find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options timer QUIET)
 
 # OPENCV
 find_package(OpenCV REQUIRED core videoio imgproc imgcodecs highgui)

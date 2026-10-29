@@ -16,10 +16,10 @@
 
 #include "cctag/filter/cvRecode.hpp"
 #include "cctag/Params.hpp"
+#include "cctag/utils/Defines.hpp"
 #include "cctag/utils/Talk.hpp" // do DO_TALK macro
 
-#include <boost/timer/timer.hpp>
-
+#include <chrono>
 #include <cstdlib> // for ::abs
 #include <climits>
 #include <cmath>
@@ -46,7 +46,13 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
                     int debug_info_level,
                     const cctag::Parameters* params)
 {
-    boost::timer::cpu_timer t;
+#if defined(DEBUG) && !defined(CCTAG_NO_COUT)
+    const auto start = std::chrono::steady_clock::now();
+    const auto elapsedMilliseconds = [start]() {
+        return std::chrono::duration<double, std::milli>(
+          std::chrono::steady_clock::now() - start).count();
+    };
+#endif
     std::vector<uchar*> stack;
     uchar **stack_top = nullptr, **stack_bottom = nullptr;
 
@@ -162,9 +168,7 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
 #define CANNY_PUSH(d) *(d) = (uchar)2, *stack_top++ = (d)
 #define CANNY_POP(d) (d) = (*--stack_top)
 
-    t.stop();
-    DO_TALK(CCTAG_COUT_DEBUG("Canny 1 took: " << t.elapsed()););
-    t.resume();
+    DO_TALK(CCTAG_COUT_DEBUG("Canny 1 took: " << elapsedMilliseconds() << " ms"););
 
     // calculate magnitude and angle of gradient, perform non-maxima suppression.
     // fill the map with one of the following values:
@@ -329,8 +333,7 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
         mag_buf[2] = _mag;
     }
 
-    t.stop();
-    DO_TALK(CCTAG_COUT_DEBUG("Canny 2 took : " << t.elapsed());)
+    DO_TALK(CCTAG_COUT_DEBUG("Canny 2 took : " << elapsedMilliseconds() << " ms");)
 
 #ifdef DEBUG_MAGMAP_BY_GRIFF
     if(mag_img_file)
@@ -358,7 +361,6 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
         delete[] write_mag;
     }
 #endif // DEBUG_MAGMAP_BY_GRIFF
-    t.resume();
 
     // now track the edges (hysteresis thresholding)
     while(stack_top > stack_bottom)
@@ -393,9 +395,7 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
             CANNY_PUSH(m + mapstep + 1);
     }
 
-    t.stop();
-    DO_TALK(CCTAG_COUT_DEBUG("Canny 3 took : " << t.elapsed());)
-    t.resume();
+    DO_TALK(CCTAG_COUT_DEBUG("Canny 3 took : " << elapsedMilliseconds() << " ms");)
 
     // the final pass, form the final image
     for(i = 0; i < size.height; i++)
@@ -417,5 +417,5 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
     delete mag_img_file;
     delete hyst_img_file;
 #endif // DEBUG_MAGMAP_BY_GRIFF
-    DO_TALK(CCTAG_COUT_DEBUG("Canny 4 : " << t.elapsed());)
+    DO_TALK(CCTAG_COUT_DEBUG("Canny 4 : " << elapsedMilliseconds() << " ms");)
 }
