@@ -29,14 +29,10 @@ EdgePointCollection::EdgePointCollection(size_t w, size_t h) :
   _edgeMapShape[0] = w; _edgeMapShape[1] = h;
   memset(&_edgeMap[0], -1, w*h*sizeof(int));  // XXX@stian: unnecessary for CUDA
   
-  if (w*h/8+4 < MAX_POINTS) {
-    memset(&_processedIn[0], 0, w*h/8+4);     // one bit per pixel + roundoff error
-    memset(&_processedAux[0], 0, w*h/8+4);    // ditto.
-  }
-  else {
-    memset(&_processedIn[0], 0, MAX_POINTS);
-    memset(&_processedAux[0], 0, MAX_POINTS);
-  }
+  // The existing flag layout stores four point indices in each unsigned word.
+  const size_t flagWords = (std::min(w*h, size_t(MAX_POINTS)) + 3) / 4;
+  memset(&_processedIn[0], 0, flagWords * sizeof(unsigned));
+  memset(&_processedAux[0], 0, flagWords * sizeof(unsigned));
 }
 
 void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
