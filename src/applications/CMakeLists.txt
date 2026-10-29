@@ -39,18 +39,7 @@ else()
 endif()
 
 # BOOST
-if(NOT TARGET Boost::boost)
-  set(BOOST_REQUIRED_COMPONENTS "date_time;serialization;filesystem;program_options;timer")
-  if(WIN32)
-    set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_windbg")
-  else()
-    set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_basic")
-  endif()
-
-  find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_COMPONENTS} QUIET)
-else()
-  message(STATUS "BOOST already there")
-endif()
+find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options QUIET)
 
 # OPENCV
 find_package(OpenCV REQUIRED core videoio imgproc imgcodecs highgui)

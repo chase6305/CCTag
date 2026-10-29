@@ -113,20 +113,22 @@ endif(APPLE)
 # FIND BOOST
 # list only components that are not header-only, those have a target associated
 # the header-only components must be added with target_include_directories( ... ${Boost_INCLUDE_DIRS} )
-set(BOOST_REQUIRED_COMPONENTS "date_time;filesystem;program_options;serialization;timer")
+set(BOOST_REQUIRED_COMPONENTS "date_time;filesystem;serialization;timer")
 if(WIN32)
   set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_windbg")
 else()
   set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_basic")
 endif()
 
+# Keep application and test dependencies out of the installed package requirements.
+set(BOOST_BUILD_COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
 if(CCTAG_BUILD_TESTS)
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};unit_test_framework")
+  list(APPEND BOOST_BUILD_COMPONENTS unit_test_framework)
   enable_testing()
   include(BoostTestHelper)
 endif()
 
-find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
+find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_BUILD_COMPONENTS})
 message(STATUS "Found Boost: version ${Boost_VERSION}")
 
 if(BUILD_SHARED_LIBS)
