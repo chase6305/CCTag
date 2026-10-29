@@ -10,6 +10,10 @@
 #include <cctag/utils/Defines.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+#include <boost/spirit/include/qi.hpp>
 
 #include <cmath>
 #include <fstream>
@@ -18,6 +22,28 @@
 
 namespace cctag
 {
+
+namespace
+{
+
+bool cctagLineParse(std::string::const_iterator first,
+                    std::string::const_iterator last,
+                    std::vector<float>& rr)
+{
+  float n;
+  using boost::phoenix::push_back;
+  using namespace boost::spirit::qi;
+  using boost::spirit::qi::_1;
+  const bool parsed = phrase_parse(first, last,
+    *((uint_[boost::phoenix::ref(n) = _1] >> '/' >>
+       uint_[boost::phoenix::ref(n) = boost::phoenix::ref(n) / _1] |
+       double_[boost::phoenix::ref(n) = _1])
+      [push_back(boost::phoenix::ref(rr), boost::phoenix::ref(n))]),
+    space);
+  return parsed && first == last;
+}
+
+} // namespace
 
 CCTagMarkersBank::CCTagMarkersBank( std::size_t nCrowns )
 {
