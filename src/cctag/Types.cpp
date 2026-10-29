@@ -7,6 +7,8 @@
  */
 
 #include <cctag/Types.hpp>
+#include <algorithm>
+#include <cstring>
 
 namespace cctag
 {

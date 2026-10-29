@@ -10,6 +10,7 @@
 
 #include <cctag/geometry/Point.hpp>
 #include <cctag/Params.hpp>
+#include <vector>
 
 namespace cctag {
 
