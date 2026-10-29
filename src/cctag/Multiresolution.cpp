@@ -301,11 +301,8 @@ void cctagMultiresDetection(
                                   params,
                                   durations );
 
-    // Gather the detected markers in the entire image pyramid
-    for(const CCTag & marker : pyramidMarkers)
-    {
-      markers.push_back( new CCTag(marker) );
-    }
+    // Transfer ownership of the detected markers without copying their point data.
+    markers.transfer(markers.end(), pyramidMarkers);
   }
   if( durations ) durations->log( "after cctagMultiresDetection_inner" );
   

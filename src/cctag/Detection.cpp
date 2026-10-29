@@ -983,7 +983,7 @@ void cctagDetection(
       update(markersFinal, marker);
     }
 
-    markers = markersFinal;
+    markers.swap(markersFinal);
   
     markers.sort();
 
