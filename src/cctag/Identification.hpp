@@ -17,7 +17,6 @@
 #include <opencv2/opencv.hpp>
 
 #include <boost/math/special_functions/pow.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <cmath>
 #include <vector>

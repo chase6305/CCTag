@@ -16,8 +16,7 @@
 #include <cctag/Detection.hpp>
 #include <cctag/utils/Talk.hpp> // for DO_TALK macro
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
+#include <chrono>
 #include <cmath>
 #include <sstream>
 #include <fstream>
@@ -207,8 +206,6 @@ static void cctagMultiresDetection_inner(
     // Data structure for getting vote winners
     std::vector<EdgePoint*> seeds;
 
-    boost::posix_time::time_duration d;
-
 #if defined(CCTAG_WITH_CUDA)
     // there is no point in measuring time in compare mode
     if( cuda_pipe ) {
@@ -324,7 +321,7 @@ void cctagMultiresDetection(
       cctag::numerical::geometry::Ellipse rescaledOuterEllipse = marker.rescaledOuterEllipse();
 
       #ifdef CCTAG_OPTIM
-        boost::posix_time::ptime t0(boost::posix_time::microsec_clock::local_time());
+        const auto t0 = std::chrono::steady_clock::now();
       #endif
       
       
@@ -335,7 +332,7 @@ void cctagMultiresDetection(
                                      pointsInHull );
 
       #ifdef CCTAG_OPTIM
-        boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+        const auto t1 = std::chrono::steady_clock::now();
       #endif
       
 
@@ -355,11 +352,11 @@ void cctagMultiresDetection(
               60); 
       
       #ifdef CCTAG_OPTIM
-        boost::posix_time::ptime t2(boost::posix_time::microsec_clock::local_time());
-        boost::posix_time::time_duration d1 = t1 - t0;
-        boost::posix_time::time_duration d2 = t2 - t1;
-        CCTAG_COUT_OPTIM("Time in selectEdgePointInEllipticHull: " << d1.total_milliseconds() << " ms");
-        CCTAG_COUT_OPTIM("Time in outlierRemoval: " << d2.total_milliseconds() << " ms");
+        const auto t2 = std::chrono::steady_clock::now();
+        const auto d1 = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
+        const auto d2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1);
+        CCTAG_COUT_OPTIM("Time in selectEdgePointInEllipticHull: " << d1.count() << " ms");
+        CCTAG_COUT_OPTIM("Time in outlierRemoval: " << d2.count() << " ms");
       #endif
 
       if(rescaledOuterEllipsePoints.size() < 5)

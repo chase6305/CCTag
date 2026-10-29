@@ -28,6 +28,7 @@
 #include <boost/assert.hpp>
 
 #include <cmath>
+#include <chrono>
 #include <mutex>
 #include <vector>
 
@@ -845,7 +846,9 @@ bool refineConicFamilyGlob(
     } else { // not CUDA
 #endif // CCTAG_WITH_CUDA
 
-        boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
+#if defined(DEBUG) && !defined(CCTAG_NO_COUT)
+        const auto optimizationStart = std::chrono::steady_clock::now();
+#endif
 
         // A. Perform the optimization ///////////////////////////////////////////////
 
@@ -881,9 +884,10 @@ bool refineConicFamilyGlob(
   }
   
   // Measure the time spent in the optimization
-  boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-  boost::posix_time::time_duration d = tend - tstart;
-  const float spendTime = d.total_milliseconds();
+#if defined(DEBUG) && !defined(CCTAG_NO_COUT)
+  const auto spendTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - optimizationStart).count();
+#endif
   DO_TALK( CCTAG_COUT_DEBUG( "Optimization result: " << optimalPoint << ", duration: " << spendTime ); )
 
 #ifdef CCTAG_WITH_CUDA
@@ -893,10 +897,7 @@ bool refineConicFamilyGlob(
   
     // B. Get the signal associated to the optimal homography/imaged center //////
     {
-        boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
         getSignals(vCuts,mHomography,src);
-        boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-        boost::posix_time::time_duration d = tend - tstart;
     }
     
     // Residual normalization
@@ -1181,7 +1182,7 @@ int identify_step_1(
   // Cheap (CPU only)
   
 #ifdef CCTAG_OPTIM
-  boost::posix_time::ptime t0(boost::posix_time::microsec_clock::local_time());
+  auto t0 = std::chrono::steady_clock::now();
 #endif
   
   // Sort outer points and then take a subsample
@@ -1189,12 +1190,12 @@ int identify_step_1(
   getSortedOuterPoints(ellipse, outerEllipsePoints, outerPoints, params._nSamplesOuterEllipse);
   
 #ifdef CCTAG_OPTIM
-  boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
-  boost::posix_time::time_duration d = t1 - t0;
+  auto t1 = std::chrono::steady_clock::now();
+  auto d = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
   float spendTime;
   DO_TALK(
 
-    spendTime = d.total_milliseconds();
+    spendTime = d.count();
     CCTAG_COUT_OPTIM("Time in subsampling: " << spendTime << " ms");
   )
 #endif
@@ -1232,27 +1233,21 @@ int identify_step_1(
   // The "signal of interest" is located between startSig and 1.f (endSig in ImageCut)
 
 #ifdef CCTAG_OPTIM
-  t0 = boost::posix_time::microsec_clock::local_time();
+  t0 = std::chrono::steady_clock::now();
 #endif
   
   // B. Collect all cuts associated to all outer points ////////////////////////
   std::vector<cctag::ImageCut> cuts;
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-    
     collectCuts( cuts, src, ellipse.center(), outerPoints, params._sampleCutLength, startSig);
-    
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
   
 #ifdef CCTAG_OPTIM
-  t1 = boost::posix_time::microsec_clock::local_time();
-  d = t1 - t0;
+  t1 = std::chrono::steady_clock::now();
+  d = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
   DO_TALK(
 
-    spendTime = d.total_milliseconds();
+    spendTime = d.count();
     CCTAG_COUT_OPTIM("Time in collectCuts: " << spendTime << " ms");
   )
 #endif
@@ -1265,8 +1260,6 @@ int identify_step_1(
   
   // C. Select a sub sample of image cuts //////////////////////////////////////
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-
     selectCutCheapUniform(
             vSelectedCuts,
             params._numCutsInIdentStep,
@@ -1278,9 +1271,6 @@ int identify_step_1(
     
     DO_TALK( CCTAG_COUT_OPTIM("Initial cut selection"); )
     
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
 
   if ( vSelectedCuts.empty() )
@@ -1375,8 +1365,6 @@ int identify_step_2(
 
   bool identSuccessful = false;
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-
     std::vector<std::list<float> > vScore;
     vScore.resize(radiusRatios.size());
 
@@ -1459,9 +1447,6 @@ int identify_step_2(
     }
 #endif // GRIFF_DEBUG
 
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
 
   // Tell if the identification is reliable or not.
