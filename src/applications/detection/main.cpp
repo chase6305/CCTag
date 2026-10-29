@@ -20,6 +20,7 @@
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/math/constants/constants.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/timer/timer.hpp>
 #include <opencv2/core/core.hpp>

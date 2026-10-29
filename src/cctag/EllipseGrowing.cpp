@@ -23,8 +23,6 @@
 #include <opencv2/core/types_c.h>
 
 #include <boost/math/special_functions/pow.hpp>
-#include <boost/math/constants/constants.hpp>
-#include <boost/mpl/bool.hpp>
 #include <boost/assert.hpp>
 
 #include <cstdio>

@@ -5,11 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/round.hpp>
 #include <boost/iterator/indirect_iterator.hpp>
 #include <cctag/EdgePoint.hpp>
 #include <cctag/Fitting.hpp>
@@ -29,6 +25,8 @@
 #include <cstdlib>
 #include <vector>
 #include <utility>
+#include <limits>
+#include <tuple>
 #include <Eigen/Eigenvalues>
 
 namespace cctag {

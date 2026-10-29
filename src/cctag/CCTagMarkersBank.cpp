@@ -6,7 +6,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <cctag/CCTagMarkersBank.hpp>
-#include <cctag/utils/Exceptions.hpp>
 #include <cctag/utils/Defines.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>

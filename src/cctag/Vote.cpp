@@ -22,13 +22,7 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/special_functions/round.hpp>
-#include <boost/math/special_functions/log1p.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/multi_array/multi_array_ref.hpp>
-#include <boost/multi_array/subarray.hpp>
 #include <boost/container/flat_set.hpp>
-
-#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <deque>
 #include <array>

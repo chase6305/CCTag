@@ -18,7 +18,6 @@
 #include <opencv2/core/core_c.h>
 
 #include <boost/array.hpp>
-#include <boost/mpl/bool.hpp>
 
 #include <cstddef>
 #include <cmath>

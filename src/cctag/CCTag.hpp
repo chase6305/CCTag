@@ -20,14 +20,9 @@
 #include <cctag/geometry/2DTransform.hpp>
 #include <cctag/utils/Defines.hpp>
 
-#include <boost/serialization/nvp.hpp>
-#include <boost/serialization/serialization.hpp>
 #include <boost/array.hpp>
-#include <boost/math/constants/constants.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/throw_exception.hpp>
-#include <boost/archive/text_oarchive.hpp>
 
 #ifdef CCTAG_WITH_CUDA
 #include "cctag/cuda/pinned_counters.h"
@@ -35,8 +30,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
+#include <iosfwd>
 #include <vector>
+
+namespace boost { namespace archive { class text_oarchive; } }
 
 namespace cctag
 {

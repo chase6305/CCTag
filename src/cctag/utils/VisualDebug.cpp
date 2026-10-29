@@ -9,6 +9,7 @@
 #include <cctag/utils/FileDebug.hpp>
 
 #include <boost/filesystem.hpp>
+#include <boost/math/constants/constants.hpp>
 #include <opencv2/opencv.hpp>
 
 #ifdef CCTAG_SERIALIZE
