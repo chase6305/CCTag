@@ -4,6 +4,21 @@ cmake_minimum_required(VERSION 3.13)
 
 include(ExternalProject)
 
+# Select vcpkg dependencies before its toolchain runs inside project().
+option(CCTAG_BUILD_APPS "Build the sample applications" ON)
+option(CCTAG_BUILD_TESTS "Build the unity tests" ON)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  if(NOT DEFINED VCPKG_MANIFEST_NO_DEFAULT_FEATURES)
+    set(VCPKG_MANIFEST_NO_DEFAULT_FEATURES ON)
+  endif()
+  if(CCTAG_BUILD_APPS)
+    list(APPEND VCPKG_MANIFEST_FEATURES apps)
+  endif()
+  if(CCTAG_BUILD_TESTS)
+    list(APPEND VCPKG_MANIFEST_FEATURES tests)
+  endif()
+endif()
+
 project(CCTag VERSION 1.0.4 LANGUAGES C CXX)
 
 # Set build path as a folder named as the platform (linux, windows, darwin...) plus the processor type
@@ -17,14 +32,12 @@ option(CCTAG_SERIALIZE "Store all the output" OFF)
 option(CCTAG_VISUAL_DEBUG "Enable visual debug" OFF)
 option(CCTAG_NO_COUT "Disable output stream" ON)
 option(CCTAG_WITH_CUDA "Compile the library with CUDA support" ON)
-option(CCTAG_BUILD_APPS "Build the sample applications" ON)
 option(CCTAG_CUDA_CC_CURRENT_ONLY "Set to on to build only for the current machine's CC" OFF)
 option(CCTAG_NVCC_WARNINGS "Switch on several additional warnings for CUDA nvcc." OFF)
 option(CCTAG_EIGEN_MEMORY_ALIGNMENT "Enable Eigen alignment" OFF)
 
 option(CCTAG_USE_POSITION_INDEPENDENT_CODE "Generate position independent code." ON)
 option(CCTAG_ENABLE_SIMD_AVX2 "Enable AVX2 optimizations" OFF)
-option(CCTAG_BUILD_TESTS "Build the unity tests" ON)
 option(CCTAG_BUILD_DOC "Build documentation" OFF)
 option(CCTAG_NO_THRUST_COPY_IF "Do not use thrust::copy_if() on GPU. There may be a bug on CUDA 7 with GTX 980, 980Ti and 1080" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)

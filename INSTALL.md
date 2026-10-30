@@ -26,6 +26,18 @@ Most of the dependencies can be installed from the common repositories (apt, yum
 * OpenCV >= 3.1
 * TBB >= 2021.5.0
 
+Boost.ProgramOptions is needed only for applications, and Boost.Test only for
+unit tests. When configuring CCTag directly with the vcpkg toolchain,
+`CCTAG_BUILD_APPS` and `CCTAG_BUILD_TESTS` select the corresponding manifest
+features before dependency installation. Set both options to `OFF` to install
+only the library dependencies. Explicit `VCPKG_MANIFEST_FEATURES` and
+`VCPKG_MANIFEST_NO_DEFAULT_FEATURES` settings are respected.
+
+A standalone `vcpkg install` still includes both features by default. Use
+`vcpkg install --x-no-default-features` for library dependencies only, adding
+`--x-feature=apps` or `--x-feature=tests` when needed. When CCTag is embedded
+with `add_subdirectory`, the parent project controls vcpkg feature selection.
+
 The installed `CCTag::CCTag` target propagates the C++17 requirement. Rebuild
 consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,
 `CCTag::radiusRatiosInit()` and `Color` use `std::array`, and the edge-linking

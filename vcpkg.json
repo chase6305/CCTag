@@ -13,14 +13,30 @@
       "version>=": "1.91.0"
     },
     "boost-exception",
-    "boost-program-options",
     "boost-ptr-container",
     "boost-serialization",
     "boost-spirit",
     "boost-stacktrace",
-    "boost-test",
     "eigen3",
     "opencv",
     "tbb"
-  ]
+  ],
+  "default-features": [
+    "apps",
+    "tests"
+  ],
+  "features": {
+    "apps": {
+      "description": "Build the detection and regression applications",
+      "dependencies": [
+        "boost-program-options"
+      ]
+    },
+    "tests": {
+      "description": "Build the unit tests",
+      "dependencies": [
+        "boost-test"
+      ]
+    }
+  }
 }
