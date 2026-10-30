@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <cmath>
 #include <filesystem>
 #include <cctag/utils/Statistics.hpp>
 #include "TestLog.h"
@@ -60,7 +61,7 @@ public:
   TestChecker(const std::string& referenceDir, const std::string& testDir, float epsilon);
   bool check();
   float elapsedTimeDifferenceMean() { return _elapsedDiffAcc.mean(); }
-  float elapsedTimeDifferenceStdev() { return sqrt(_elapsedDiffAcc.variance()); }
+  float elapsedTimeDifferenceStdev() { return std::sqrt(_elapsedDiffAcc.variance()); }
   float qualityDifferenceMean() { return _qualityDiffAcc.mean(); }
-  float qualityDifferenceStdev() { return sqrt(_qualityDiffAcc.variance()); }
+  float qualityDifferenceStdev() { return std::sqrt(_qualityDiffAcc.variance()); }
 };
