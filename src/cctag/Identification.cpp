@@ -23,6 +23,7 @@
 
 #include <cctag/utils/Statistics.hpp>
 #include <cassert>
+#include <stdexcept>
 
 #include <cmath>
 #include <chrono>
@@ -646,55 +647,37 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::
 
 std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut)
 {
-  //double guassOneD[] = { 0.0044, 0.0540, 0.2420, 0.3991, 0.2420, 0.0540, 0.0044 };
-  
-  std::vector<float> output;
-  std::size_t sizeCut = cut.imgSignal().size();
-  std::size_t sizeKernel = kernel.size();
-  output.resize(sizeCut);
-  
-  std::size_t halfSize = (sizeKernel-1)/2;
-  
-  //std::cout << "before = [" << std::endl;
-  //for ( std::size_t i=0 ; i<sizeCut; ++i)
-  //{
-  //  std::cout << cut.imgSignal()[i] << " , " ;
-  //}
-  //std::cout << "]; " << std::endl;
-  
-  for ( std::ssize_t i=0 ; i<sizeCut; ++i)
+  const auto& signal = cut.imgSignal();
+  if(signal.empty())
+    throw std::invalid_argument("convImageCut requires a non-empty signal");
+
+  const std::size_t sizeCut = signal.size();
+  const std::size_t sizeKernel = kernel.size();
+  const std::size_t halfSize = (sizeKernel - 1) / 2;
+  float maxValue = 0.f;
+  float maxLocation = 0.f;
+
+  for(std::ssize_t i = 0; i < sizeCut; ++i)
   {
     float tmp = 0;
-    for ( std::size_t j=0 ; j<sizeKernel; ++j)
+    for(std::size_t j = 0; j < sizeKernel; ++j)
     {
       const std::ssize_t res = i - halfSize + j;
-      if (res < 0 )
-        tmp += cut.imgSignal()[0]*kernel[j];
-      else if(res >=  sizeCut)
-        tmp += cut.imgSignal()[sizeCut-1]*kernel[j];
+      if(res < 0)
+        tmp += signal[0] * kernel[j];
+      else if(res >= sizeCut)
+        tmp += signal[sizeCut - 1] * kernel[j];
       else
-        tmp += cut.imgSignal()[i-halfSize+j]*kernel[j];
+        tmp += signal[i - halfSize + j] * kernel[j];
     }
-    output[i] = tmp;
+    // Match max_element: retain the first maximum, even for a first-sample NaN.
+    if(i == 0 || maxValue < tmp)
+    {
+      maxValue = tmp;
+      maxLocation = static_cast<float>(i);
+    }
   }
-  
-  //std::cout << "convolved = [" << std::endl;
-  //for ( std::size_t i=0 ; i<sizeCut; ++i)
-  //{
-  //  std::cout << output[i] << " , " ;
-  //}
-  //std::cout << "]; " << std::endl;
-  
-  //cut.imgSignal() = output;
-  
-  // Locate the maximum value.
-  auto maxValueIt = std::max_element(output.begin(), output.end());
-  float itsLocation = (float) std::distance(output.begin(), maxValueIt);
-  
-  //CCTAG_COUT_VAR2(*maxValueIt, itsLocation);
-
-  // max value, its location
-  return {*maxValueIt, itsLocation};
+  return {maxValue, maxLocation};
 }
 
 /**

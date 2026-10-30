@@ -158,6 +158,8 @@ void cutInterpolated(
         cctag::ImageCut & cut,
         const cv::Mat & src);
 
+/// Return the first convolution maximum and its sample index.
+/// Throws std::invalid_argument when the image signal is empty.
 std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut);
 
 void blurImageCut(float sigma, cctag::ImageCut & cut);

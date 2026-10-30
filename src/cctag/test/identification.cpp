@@ -4,6 +4,9 @@
 #include <boost/test/unit_test.hpp>
 
 #include <cctag/Identification.hpp>
+#include <limits>
+#include <cmath>
+#include <stdexcept>
 
 BOOST_AUTO_TEST_SUITE(test_identification)
 
@@ -28,6 +31,44 @@ BOOST_AUTO_TEST_CASE(failed_center_optimization_preserves_input_geometry)
     BOOST_CHECK_EQUAL(center.y(), 32.f);
     BOOST_CHECK(homography.isIdentity());
     cctag::CCTagVisualDebug::instance().clearSessions();
+}
+
+BOOST_AUTO_TEST_CASE(convolution_clamps_boundaries_and_keeps_first_peak)
+{
+    cctag::ImageCut cut;
+    cut.imgSignal() = {5.f, 0.f};
+    auto peak = cctag::identification::convImageCut({1.f, 1.f, 1.f}, cut);
+    BOOST_CHECK_EQUAL(peak.first, 10.f);
+    BOOST_CHECK_EQUAL(peak.second, 0.f);
+    cut.imgSignal() = {-7.f, -2.f, -5.f};
+    peak = cctag::identification::convImageCut({1.f}, cut);
+    BOOST_CHECK_EQUAL(peak.first, -2.f);
+    BOOST_CHECK_EQUAL(peak.second, 1.f);
+    cut.imgSignal() = {3.f, 3.f, 2.f};
+    peak = cctag::identification::convImageCut({1.f}, cut);
+    BOOST_CHECK_EQUAL(peak.first, 3.f);
+    BOOST_CHECK_EQUAL(peak.second, 0.f);
+}
+
+BOOST_AUTO_TEST_CASE(convolution_handles_empty_singleton_and_nan_signals)
+{
+    cctag::ImageCut cut;
+    BOOST_CHECK_THROW(cctag::identification::convImageCut({1.f}, cut), std::invalid_argument);
+    cut.imgSignal() = {-3.f};
+    auto peak = cctag::identification::convImageCut({1.f, 1.f, 1.f}, cut);
+    BOOST_CHECK_EQUAL(peak.first, -9.f);
+    BOOST_CHECK_EQUAL(peak.second, 0.f);
+    peak = cctag::identification::convImageCut({}, cut);
+    BOOST_CHECK_EQUAL(peak.first, 0.f);
+    BOOST_CHECK_EQUAL(peak.second, 0.f);
+    cut.imgSignal() = {std::numeric_limits<float>::quiet_NaN(), 2.f};
+    peak = cctag::identification::convImageCut({1.f}, cut);
+    BOOST_CHECK(std::isnan(peak.first));
+    BOOST_CHECK_EQUAL(peak.second, 0.f);
+    cut.imgSignal() = {1.f, std::numeric_limits<float>::quiet_NaN(), 2.f};
+    peak = cctag::identification::convImageCut({1.f}, cut);
+    BOOST_CHECK_EQUAL(peak.first, 2.f);
+    BOOST_CHECK_EQUAL(peak.second, 2.f);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
