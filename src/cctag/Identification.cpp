@@ -76,10 +76,7 @@ bool orazioDistanceRobust(
     const cctag::ImageCut& cut = cuts[i];
     if ( !cut.outOfBounds() )
     {
-      MapT sortedId; // 6-nearest neighbours along with their affectation probability
-      const std::size_t sizeIds = 6;
-      IdSet idSet;
-      idSet.reserve(sizeIds);
+      MapT sortedId;
 
       // imgSig contains the rectified 1D signal.
       //boost::numeric::ublas::vector<float> imgSig( cuts.front().imgSignal().size() );
@@ -163,24 +160,17 @@ bool orazioDistanceRobust(
   #ifdef GRIFF_DEBUG
       assert( sortedId.size() > 0 );
   #endif // GRIFF_DEBUG
-      int k = 0;
-      for( auto riter = sortedId.crbegin(); riter != sortedId.crend(); ++riter )
-      {
-        if( k >= sizeIds ) break;
-        idSet.emplace_back(riter->second, riter->first);
-        ++k;
-      }
+      const auto best = sortedId.crbegin();
 
   #ifdef GRIFF_DEBUG
-      assert( idSet.size() > 0 );
-      MarkerID _debug_m = idSet.front().first;
+      MarkerID _debug_m = best->second;
       assert( _debug_m > 0 );
       assert( vScore.size() > _debug_m );
   #endif // GRIFF_DEBUG
 
       {
         std::lock_guard<std::mutex> lock(vscore_mutex);
-        vScore[idSet.front().first].push_back(idSet.front().second);
+        vScore[best->second].push_back(best->first);
       }
     }
   });
