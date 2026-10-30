@@ -423,10 +423,13 @@ void vote(EdgePointCollection& edgeCollection,
             const float f = 1.f;
 
             std::vector<Eigen::Vector3f> pts;
-            pts.reserve(children.size());
+            // The floating-point stride can select one extra sample at the end.
+            const auto sampleCapacity = std::min(children.size(), nSubsampleSize + 1);
+            pts.reserve(sampleCapacity);
 
             std::vector<float> weights;
-            weights.reserve(children.size());
+            if (weightedType != NO_WEIGHT)
+                weights.reserve(sampleCapacity);
 
             // Store a subset of EdgePoint* on which the robust ellipse estimation will
             // performed. Considering a subset of points is valid as what matters is the 
@@ -608,7 +611,7 @@ void vote(EdgePointCollection& edgeCollection,
 
         std::array<int, 5> permutations;
         std::vector<cctag::Point2d<Eigen::Vector3f> > points;
-        points.reserve(5);
+        points.reserve(8);
         while (cnt < 100)
         {
             points.clear(); // Capacity is kept, but the elements are all erased
