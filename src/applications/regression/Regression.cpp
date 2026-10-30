@@ -14,7 +14,7 @@ static bool SortTags(FrameLog& log);
 
 /////////////////////////////////////////////////////////////////////////////
 
-TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir, boost::optional<bool> useCuda) :
+TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir, CudaMode useCuda) :
   _inputDirPath(inputDir), _outputDirPath(outputDir), _useCuda(useCuda)
 {
   if (!exists(_inputDirPath) || !is_directory(_inputDirPath))
@@ -27,8 +27,8 @@ TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir
 
 void TestRunner::adjustParameters(cctag::Parameters& parameters)
 {
-  if (_useCuda.has_value())
-    parameters._useCuda = *_useCuda;
+  if (_useCuda != CudaMode::FromParameters)
+    parameters._useCuda = _useCuda == CudaMode::Enabled;
 }
 
 // Input directory must contain images.

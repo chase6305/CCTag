@@ -37,12 +37,7 @@ void CCTagFileDebug::newSession(const std::string& sessionName)
 {
 #ifdef CCTAG_SERIALIZE
     // Don't erase old sessions
-    Sessions::iterator it = _sessions.find(sessionName);
-    if (it == _sessions.end()) {
-        _sstream = &_sessions[sessionName];
-    } else {
-        _sstream = it->second;
-    }
+    _sstream = &_sessions[sessionName];
 #endif
 }
 
@@ -151,7 +146,7 @@ void CCTagFileDebug::outPutAllSessions() const
     for (Sessions::const_iterator it = _sessions.begin(), itEnd = _sessions.end(); it != itEnd; ++it) {
         const std::string filename = _path + "/" + it->first; //cctagFileDebug_
         std::ofstream f(filename.c_str());
-        f << it->second->str();
+        f << it->second.str();
     }
 #endif
 }
@@ -159,7 +154,8 @@ void CCTagFileDebug::outPutAllSessions() const
 void CCTagFileDebug::clearSessions()
 {
 #ifdef CCTAG_SERIALIZE
-    _sessions.erase(_sessions.begin(), _sessions.end());
+    _sessions.clear();
+    _sstream = nullptr;
 #endif
 }
 

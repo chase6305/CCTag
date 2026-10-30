@@ -8,15 +8,17 @@
 #include <cctag/SubPixEdgeOptimizer.hpp>
 #include <cctag/ImageCut.hpp>
 #include <cctag/geometry/Distance.hpp>
-#include <cctag/utils/Exceptions.hpp>
 #include <cctag/utils/Defines.hpp>
 
-#include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/pow.hpp>
+#include <cctag/utils/Math.hpp>
 
 #include <cmath>
 #include <cstddef>
 #include <ostream>
+
+#if defined(WITH_OPTPP) && defined(SUBPIX_EDGE_OPTIM)
+#include <cctag/utils/Exceptions.hpp>
+#endif
 
 namespace cctag {
 
@@ -101,11 +103,11 @@ void SubPixEdgeOptimizer::subPix( int n, const NEWMAT::ColumnVector& x, double& 
 		else
 		{
 			// inside the slope
-			const float gt = 0.5f + 1.f / boost::math::constants::pi<float>() * ( t * std::sqrt( 1.f - t * t ) + std::asin( t ) );
+			const float gt = 0.5f + 1.f / cctag::numerical::pi<float>() * ( t * std::sqrt( 1.f - t * t ) + std::asin( t ) );
 			ft = gt * ( imax - imin ) + imin;
 		}
 		// minimization of the distance between signal and parametric model (least square sense).
-		res += boost::math::pow<2>( sig(i) - ft );
+		res += cctag::numerical::square( sig(i) - ft );
 
 		pindx += kx;
 		pindy += ky;

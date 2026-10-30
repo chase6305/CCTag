@@ -23,9 +23,8 @@
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
-#include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
-#include <boost/assert.hpp>
+#include <cassert>
 
 #include <cmath>
 #include <chrono>
@@ -54,7 +53,7 @@ bool orazioDistanceRobust(
         const std::vector<cctag::ImageCut> & cuts,
         float minIdentProba)
 {
-  BOOST_ASSERT( cuts.size() > 0 );
+  assert( cuts.size() > 0 );
 
   using namespace cctag::numerical;
   using namespace boost::accumulators;
@@ -217,7 +216,6 @@ void extractSignalUsingHomography(
         const Eigen::Matrix3f & mHomography,
         const Eigen::Matrix3f & mInvHomography)
 {
-  using namespace boost;
   using namespace cctag::numerical;
   
   float xStart, xStop, yStart, yStop;
@@ -331,14 +329,13 @@ void extractSignalUsingHomographyDeprec(
         float begin,
         float end)
 {
-  using namespace boost;
   using namespace cctag::numerical;
 
-  BOOST_ASSERT( rectifiedCut.imgSignal().size() == 0 );
-  BOOST_ASSERT( end >= begin );
+  assert( rectifiedCut.imgSignal().size() == 0 );
+  assert( end >= begin );
   
   // Check wheter the image signal size has been properly allocated.
-  BOOST_ASSERT( nSamples == rectifiedCut.imgSignal().size() );
+  assert( nSamples == rectifiedCut.imgSignal().size() );
 
   nSamples = rectifiedCut.imgSignal().size();
   
@@ -515,7 +512,7 @@ float costSelectCutFun(
   float sumVar = 0;
   for( const std::size_t i : randomIdx )
   {
-    BOOST_ASSERT( i < varCuts.size() );
+    assert( i < varCuts.size() );
     
     //CCTAG_COUT_VAR(outerPoints[i].gradient());
     //CCTAG_COUT_VAR(sqrt(outerPoints[i].dX()*outerPoints[i].dX()
@@ -549,7 +546,6 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
         const float scale,
         const size_t numSamplesOuterEdgePointsRefinement)
 {
-  using namespace boost::numeric;
   using namespace boost::accumulators;
   using namespace cctag::numerical;
 
@@ -600,7 +596,7 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
 bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::size_t numSamplesOuterEdgePointsRefinement)
 {
     // Subpixellic refinement of the outer edge points ///////////////////////////
-    const float cutLengthOuterPointRefine = 3.f * sqrt(2.f) * scale; // with scale=2^i, i=0..nLevel
+    const float cutLengthOuterPointRefine = 3.f * std::sqrt(2.f) * scale; // with scale=2^i, i=0..nLevel
     const float halfWidth = cutLengthOuterPointRefine / 2.f;
 
     Eigen::Vector2f gradDirection = cut.stop().gradient()/cut.stop().gradient().norm();
@@ -779,9 +775,9 @@ void computeHomographyFromEllipseAndImagedCenter(
 
     Eigen::Matrix3f mDiag;
     mDiag.setIdentity();
-    mDiag(0,0) = sqrt((Q22*Q33/Q11*(Q11*xc*xc + Q22*yc*yc + Q33)));
+    mDiag(0,0) = std::sqrt((Q22*Q33/Q11*(Q11*xc*xc + Q22*yc*yc + Q33)));
     mDiag(1,1) = Q33;
-    mDiag(2,2) = sqrt(-Q22*(Q11*xc*xc + Q33));
+    mDiag(2,2) = std::sqrt(-Q22*(Q11*xc*xc + Q33));
 
     for(int i=0; i < 3 ; ++i)
     {
@@ -954,7 +950,7 @@ bool refineConicFamilyGlob(
     
     // Final normalized residual
     
-    residual = sqrt(residual)/magnitude;
+    residual = std::sqrt(residual)/magnitude;
     if ( residual > 2.7f )
       return false;
     else
@@ -1036,9 +1032,9 @@ bool imageCenterOptimizationGlob(
         {       
         
                 // Update the residual and the optimized parameters
-                hasASolution = true;
                 if ( res < minRes )
                 {
+                    hasASolution = true;
                     minRes = res;
                     optimalPoint = point;
                     optimalHomography = mTempHomography;
@@ -1047,6 +1043,9 @@ bool imageCenterOptimizationGlob(
                 CCTAG_COUT_VAR_OPTIM(readable);
         }
     } // for(point : nearbyPoints)
+
+    if(!hasASolution)
+        return false;
 
     center = optimalPoint;
     mHomography = optimalHomography;

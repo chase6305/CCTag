@@ -9,7 +9,7 @@
 #include <cctag/utils/FileDebug.hpp>
 
 #include <boost/filesystem.hpp>
-#include <boost/math/constants/constants.hpp>
+#include <cctag/utils/Math.hpp>
 #include <opencv2/opencv.hpp>
 
 #ifdef CCTAG_SERIALIZE
@@ -244,7 +244,7 @@ void CCTagVisualDebug::drawMarker(const cctag::CCTag& marker, bool drawScaledMar
   
   cv::ellipse(_backImage , cv::Point(center.x(),center.y()),
       cv::Size(rescaledOuterEllipse.a(), rescaledOuterEllipse.b()),
-      rescaledOuterEllipse.angle()*180/boost::math::constants::pi<double>(), 0, 360, color);
+      rescaledOuterEllipse.angle()*180/cctag::numerical::pi<double>(), 0, 360, color);
 #endif
 }
 
@@ -254,7 +254,7 @@ void CCTagVisualDebug::drawInfos(const cctag::CCTag& marker, bool drawScaledMark
     CvFont font1;
   cvInitFont(&font1, CV_FONT_HERSHEY_SIMPLEX, 0.8, 0.8, 0, 2);
 
-  std::string sId = boost::lexical_cast<std::string>(marker.id() + 1);
+  std::string sId = std::to_string(marker.id() + 1);
 
   int x, y;
   if (drawScaledMarker) {

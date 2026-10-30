@@ -22,28 +22,17 @@ install:
     - vcpkg list
     - vcpkg install
           boost-accumulators
-          boost-algorithm
+          boost-array
+          boost-assert
           boost-container
-          boost-date-time
           boost-exception
           boost-filesystem
-          boost-iterator
-          boost-lexical-cast
-          boost-math
-          boost-mpl
-          boost-multi-array
           boost-ptr-container
           boost-program-options
           boost-serialization
           boost-spirit
-          boost-static-assert
           boost-stacktrace
           boost-test
-          boost-thread
-          boost-throw-exception
-          boost-timer
-          boost-type-traits
-          boost-unordered
           opencv
           tbb
           eigen3

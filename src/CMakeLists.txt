@@ -76,6 +76,7 @@ set( CCTag_HEADERS
         ./cctag/utils/Exceptions.hpp
         ./cctag/utils/FileDebug.hpp
         ./cctag/utils/LogTime.hpp
+        ./cctag/utils/Math.hpp
         ./cctag/utils/Release.hpp
         ./cctag/utils/Singleton.hpp
         ./cctag/utils/Talk.hpp
@@ -174,7 +175,6 @@ if(CCTAG_WITH_CUDA)
   # since we used CUDA_ADD_LIBRARY we cannot use PUBLIC or PRIVATE here
   target_link_libraries(CCTag
                        ${OpenCV_LIBS}
-                       Boost::date_time 
                        Boost::serialization 
                        Boost::filesystem 
                        Eigen3::Eigen
@@ -221,7 +221,6 @@ else() # without CUDA
                         PUBLIC
                           ${OpenCV_LIBS}
                           Eigen3::Eigen
-                          Boost::date_time
                           Boost::filesystem
                           Boost::serialization 
                         PRIVATE

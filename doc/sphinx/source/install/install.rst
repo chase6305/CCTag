@@ -116,33 +116,20 @@ To install the dependencies:
 
   vcpkg install
           boost-accumulators
-          boost-algorithm
+          boost-array
+          boost-assert
           boost-container
-          boost-date-time
           boost-exception
           boost-filesystem
-          boost-iterator
-          boost-lexical-cast
-          boost-math
-          boost-mpl
-          boost-multi-array
           boost-ptr-container
           boost-program-options
           boost-serialization
           boost-spirit
-          boost-static-assert
           boost-stacktrace
           boost-test
-          boost-thread
-          boost-throw-exception
-          boost-timer
-          boost-type-traits
-          boost-unordered
           opencv
           tbb
           eigen3
-
-Note that for boost >= 1.85 you have to use :code:`math[legacy]`.
 
 You can add the flag :code:`--triplet` to specify the architecture and the version you want to build.
 For example:

@@ -1,6 +1,5 @@
 # Version 3,4 is the first that supports separable compilation on Linux.
 # Windows requires more work, and Mac is probably still hopeless.
-# Version 3.13 is needed for boost-stacktrace
 cmake_minimum_required(VERSION 3.13)
 
 include(ExternalProject)
@@ -113,13 +112,7 @@ endif(APPLE)
 # FIND BOOST
 # list only components that are not header-only, those have a target associated
 # the header-only components must be added with target_include_directories( ... ${Boost_INCLUDE_DIRS} )
-set(BOOST_REQUIRED_COMPONENTS "date_time;filesystem;serialization")
-if(WIN32)
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_windbg")
-else()
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_basic")
-endif()
-
+set(BOOST_REQUIRED_COMPONENTS "filesystem;serialization")
 # Keep application and test dependencies out of the installed package requirements.
 set(BOOST_BUILD_COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
 if(CCTAG_BUILD_TESTS)

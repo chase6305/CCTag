@@ -8,7 +8,6 @@
 #pragma once
 
 #include <stdexcept>
-#include <boost/optional.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -18,17 +17,19 @@
 
 namespace bacc = boost::accumulators;
 
+enum class CudaMode { FromParameters, Disabled, Enabled };
+
 class TestRunner
 {
   const boost::filesystem::path _inputDirPath;
   const boost::filesystem::path _outputDirPath;
-  const boost::optional<bool> _useCuda;
+  const CudaMode _useCuda;
   std::vector<boost::filesystem::path> _inputFilePaths;
   
   void adjustParameters(cctag::Parameters& parameters);
   
 public:
-  TestRunner(const std::string& inputDir, const std::string& outputDir, boost::optional<bool> useCuda);
+  TestRunner(const std::string& inputDir, const std::string& outputDir, CudaMode useCuda);
   void generateReferenceResults(cctag::Parameters parameters);
   void generateTestResults();
 };

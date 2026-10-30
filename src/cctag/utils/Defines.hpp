@@ -55,13 +55,15 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // Assert needs to be everywhere
-#include <boost/static_assert.hpp>
-#include <boost/type_traits.hpp>
 #include <boost/current_function.hpp>
 
 ////////////////////////////////////////////////////////////////////////////////
 // compatibility problems...
 #include <cstddef>
+#include <cstdint>
+#ifndef _MSC_VER
+#include <sys/types.h>
+#endif
 namespace std {
 #ifdef _MSC_VER
 	using ssize_t = intptr_t;

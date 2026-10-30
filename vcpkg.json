@@ -9,37 +9,21 @@
   "license": "MPL-2.0",
   "dependencies": [
     "boost-accumulators",
-    "boost-algorithm",
+    "boost-array",
+    "boost-assert",
     {
       "name": "boost-config",
       "version>=": "1.91.0"
     },
     "boost-container",
-    "boost-date-time",
     "boost-exception",
     "boost-filesystem",
-    "boost-foreach",
-    "boost-iterator",
-    "boost-lexical-cast",
-    {
-      "name": "boost-math",
-      "features": [
-        "legacy"
-      ]
-    },
-    "boost-mpl",
-    "boost-multi-array",
     "boost-program-options",
     "boost-ptr-container",
     "boost-serialization",
     "boost-spirit",
     "boost-stacktrace",
     "boost-test",
-    "boost-thread",
-    "boost-throw-exception",
-    "boost-timer",
-    "boost-type-traits",
-    "boost-unordered",
     "eigen3",
     "opencv",
     "tbb"

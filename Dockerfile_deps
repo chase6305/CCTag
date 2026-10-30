@@ -56,7 +56,7 @@ WORKDIR /tmp/boost
 RUN wget https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     tar -xzf boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     cd boost_${BOOST_VERSION_FILENAME} && \
-    ./bootstrap.sh --with-libraries=atomic,container,date_time,exception,filesystem,graph,log,math,program_options,regex,serialization,system,test,thread,stacktrace,timer --prefix="${DEPS_INSTALL_PATH}" && \
+    ./bootstrap.sh --with-libraries=filesystem,program_options,serialization,system,test,stacktrace --prefix="${DEPS_INSTALL_PATH}" && \
     ./b2 link=shared install && \
     cd /opt && \
     rm -rf /tmp/boost

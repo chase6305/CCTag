@@ -6,12 +6,36 @@
 
 #include <cctag/geometry/Point.hpp>
 #include <cctag/geometry/Ellipse.hpp>
+#include <cctag/geometry/Distance.hpp>
+#include <cctag/geometry/EllipseFromPoints.hpp>
 #include <Eigen/Geometry>
-#include <boost/math/constants/constants.hpp>
+#include <cctag/utils/Math.hpp>
+#include <limits>
 
 using Point3f = cctag::Point2d<Eigen::Vector3f>;
 
 BOOST_AUTO_TEST_SUITE(test_ellipse)
+
+BOOST_AUTO_TEST_CASE(test_pixel_distance_avoids_integer_square_overflow)
+{
+    using Point3i = cctag::Point2d<Eigen::Vector3i>;
+    const Point3i a(-32760, 0);
+    const Point3i b(32760, 0);
+    BOOST_CHECK_EQUAL(cctag::numerical::distancePoints2D(a, b), 65520.f);
+    BOOST_CHECK_EQUAL(cctag::numerical::distancePoints2D(Point3f(0.f, 0.f), Point3f(3.f, 4.f)), 5.f);
+}
+
+BOOST_AUTO_TEST_CASE(test_nonfinite_ellipse_coordinates_throw_before_integer_conversion)
+{
+    using namespace cctag::numerical::geometry;
+    Ellipse ellipse(Point3f(0.f, 0.f), 5.f, 3.f, 0.f);
+    cctag::Point2d<Eigen::Vector3i> a, b, c, d;
+    for(float invalid : {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
+    {
+        ellipse.center().x() = invalid;
+        BOOST_CHECK_THROW(computeIntermediatePoints(ellipse, a, b, c, d), std::runtime_error);
+    }
+}
 
 BOOST_AUTO_TEST_CASE(test_ellipse_representation)
 {
@@ -44,8 +68,8 @@ BOOST_AUTO_TEST_CASE(test_ellipse_representation)
     pts.emplace_back( 4.7553f, -0.9271f);
     pts.emplace_back( 5.0000f, .0f);
 
-    const float pi_f = boost::math::constants::pi<float>();
-    const float pi_2_f = boost::math::constants::half_pi<float>();
+    const float pi_f = cctag::numerical::pi<float>();
+    const float pi_2_f = (cctag::numerical::pi<float>() / 2.f);
     const std::size_t numTrials = 10;
     const float step = pi_f/numTrials;
 

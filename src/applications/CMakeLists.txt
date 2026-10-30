@@ -39,7 +39,7 @@ else()
 endif()
 
 # BOOST
-find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options timer QUIET)
+find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options QUIET)
 
 # OPENCV
 find_package(OpenCV REQUIRED core videoio imgproc imgcodecs highgui)
@@ -74,7 +74,7 @@ target_link_libraries(detection PUBLIC
   CCTag::CCTag
   TBB::tbb
   ${OpenCV_LIBS}
-  Boost::filesystem Boost::program_options Boost::timer
+  Boost::filesystem Boost::program_options
   )
 
 if(IL_FOUND OR DevIL_FOUND)

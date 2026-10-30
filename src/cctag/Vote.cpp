@@ -20,8 +20,7 @@
 #include <cctag/utils/Defines.hpp>
 #include <cctag/utils/VisualDebug.hpp>
 
-#include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/round.hpp>
+#include <cctag/utils/Math.hpp>
 #include <boost/container/flat_set.hpp>
 
 #include <deque>
@@ -284,7 +283,7 @@ void vote(EdgePointCollection& edgeCollection,
         while ((i < maxLength) && (found) && (averageVote >= averageVoteMin) )
         {
 
-            float angle = std::fmod(float(std::atan2(p->dY(), p->dX())) + 2.0f * boost::math::constants::pi<float>(), 2.0f * boost::math::constants::pi<float>());
+            float angle = std::fmod(float(std::atan2(p->dY(), p->dX())) + 2.0f * cctag::numerical::pi<float>(), 2.0f * cctag::numerical::pi<float>());
             phi.push_back(angle);
             //sumPhi += angle;
 
@@ -294,7 +293,7 @@ void vote(EdgePointCollection& edgeCollection,
 
             }
 
-            int shifting = (int) boost::math::round(((angle + boost::math::constants::pi<float>() / 4.0f) / (2.0f * boost::math::constants::pi<float>())) * 8.0f) - 1;
+            int shifting = (int) cctag::numerical::round(((angle + cctag::numerical::pi<float>() / 4.0f) / (2.0f * cctag::numerical::pi<float>())) * 8.0f) - 1;
 
             static int xoff[] = {1, 1, 0, -1, -1, -1, 0, 1};
             int yoff[] = {0, dir * -1, dir * -1, dir * -1, 0, dir * 1, dir * 1, dir * 1};

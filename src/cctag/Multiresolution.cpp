@@ -17,6 +17,7 @@
 #include <cctag/utils/Talk.hpp> // for DO_TALK macro
 
 #include <chrono>
+#include <cassert>
 #include <cmath>
 #include <sstream>
 #include <fstream>
@@ -47,8 +48,8 @@ static bool intersectLineToTwoEllipses(
 {
   std::vector<float> intersectionsOut = numerical::geometry::intersectEllipseWithLine(qOut, y, true);
   std::vector<float> intersectionsIn = numerical::geometry::intersectEllipseWithLine(qIn, y, true);
-  BOOST_ASSERT(intersectionsOut.size() <= 2);
-  BOOST_ASSERT(intersectionsIn.size() <= 2);
+  assert(intersectionsOut.size() <= 2);
+  assert(intersectionsIn.size() <= 2);
   if ((intersectionsOut.size() == 2) && (intersectionsIn.size() == 2))
   {
     std::ssize_t begin1 = std::max(0, (int) intersectionsOut[0]);
@@ -282,7 +283,7 @@ void cctagMultiresDetection(
     vEdgePointCollections[i].reset(new EdgePointCollection(imgGraySrc.cols, imgGraySrc.rows));
   }
 
-  BOOST_ASSERT( params._numberOfMultiresLayers - numProcLayers >= 0 );
+  assert( params._numberOfMultiresLayers - numProcLayers >= 0 );
   for( int i = numProcLayers-1; i >= 0; i-- )
   {
     CCTag::List pyramidMarkers;
@@ -315,7 +316,7 @@ void cctagMultiresDetection(
     // if the marker has to be rescaled into the original image
     if (i > 0)
     {
-      BOOST_ASSERT( i < params._numberOfMultiresLayers );
+      assert( i < params._numberOfMultiresLayers );
       float scale = marker.scale(); // pow( 2.0, (float)i );
 
       cctag::numerical::geometry::Ellipse rescaledOuterEllipse = marker.rescaledOuterEllipse();

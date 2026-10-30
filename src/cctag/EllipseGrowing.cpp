@@ -22,8 +22,8 @@
 #include <opencv2/core/core_c.h>
 #include <opencv2/core/types_c.h>
 
-#include <boost/math/special_functions/pow.hpp>
-#include <boost/assert.hpp>
+#include <cctag/utils/Math.hpp>
+#include <cassert>
 
 #include <cstdio>
 #include <cstdlib>
@@ -139,7 +139,7 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
         edgeCollection.set_processed_aux(p, true);
         vProcessedEdgePoint.push_back(p);
 
-        float normGrad = sqrt(p->dX() * p->dX() + p->dY() * p->dY());
+        float normGrad = std::sqrt(p->dX() * p->dX() + p->dY() * p->dY());
 
         gradE(0) = p->dX() / normGrad;
         gradE(1) = p->dY() / normGrad;
@@ -147,7 +147,7 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
         toto(0) = outerEllipse.center().x() - p->x();
         toto(1) = outerEllipse.center().y() - p->y();
 
-        float distancePointToCenter = sqrt(toto(0) * toto(0) + toto(1) * toto(1));
+        float distancePointToCenter = std::sqrt(toto(0) * toto(0) + toto(1) * toto(1));
         toto(0) /= distancePointToCenter;
         toto(1) /= distancePointToCenter;
 
@@ -213,7 +213,7 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
  */
 bool isGoodEGPoints(const std::vector<EdgePoint*>& filteredChildren, Point2d<Vector3s> & p1, Point2d<Vector3s> & p2)
 {
-  BOOST_ASSERT(filteredChildren.size() >= 5);
+  assert(filteredChildren.size() >= 5);
 
   static const float thrCosDiffMax = 0.25;
 
@@ -253,7 +253,7 @@ numerical::geometry::Circle computeCircleFromOuterEllipsePoints(const std::vecto
   l(1) = aux(1);
   l(2) = 1;
 
-  const float normL = std::sqrt(boost::math::pow<2>(l(0)) + boost::math::pow<2>(l(1)));
+  const float normL = std::sqrt(cctag::numerical::square(l(0)) + cctag::numerical::square(l(1)));
 
   const EdgePoint * pMax = filteredChildren.front();
   float distMax = std::min(
@@ -325,7 +325,7 @@ void connectedPoint(std::vector<EdgePoint*>& pts, int runId,
         const EdgePointCollection& img, numerical::geometry::Ellipse& qIn,
         numerical::geometry::Ellipse& qOut, int x, int y)
 {
-  BOOST_ASSERT(img(x,y));
+  assert(img(x,y));
   const size_t threadMask = (size_t)1 << runId;
   img(x,y)->_processed |= threadMask;  // Set as processed
 

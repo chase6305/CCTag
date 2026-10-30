@@ -53,6 +53,27 @@ bool fit_and_check_ellipse(const std::vector<Point3f>& pts)
 
 BOOST_AUTO_TEST_SUITE(test_ellipseFitting)
 
+BOOST_AUTO_TEST_CASE(test_edge_point_pointers_match_value_fitting)
+{
+    std::vector<cctag::EdgePoint> edges;
+    const std::vector<Point3f> values = {
+        {10.f, 0.f}, {8.f, 3.f}, {0.f, 5.f}, {-8.f, 3.f},
+        {-10.f, 0.f}, {-8.f, -3.f}, {0.f, -5.f}, {8.f, -3.f}
+    };
+    for(const auto& point : values)
+        edges.emplace_back(point.x(), point.y(), 1.f, 1.f);
+    std::vector<cctag::EdgePoint*> pointers;
+    for(auto& edge : edges)
+        pointers.push_back(&edge);
+
+    cctag::numerical::geometry::Ellipse fromValues, fromPointers;
+    cctag::numerical::ellipseFitting(fromValues, values);
+    cctag::numerical::ellipseFitting(fromPointers, pointers);
+    BOOST_CHECK_SMALL((fromValues.matrix() - fromPointers.matrix()).norm(), 1e-6f);
+    pointers.resize(4);
+    BOOST_CHECK_THROW(cctag::numerical::ellipseFitting(fromPointers, pointers), std::domain_error);
+}
+
 BOOST_AUTO_TEST_CASE(test_pixel_int)
 {
     std::vector<Point3f> pts;

@@ -19,6 +19,7 @@
 #include <ios>
 #include <iterator>
 #include <limits>
+#include <utility>
 
 namespace cctag
 {
@@ -86,7 +87,7 @@ void CCTagMarkersBank::read( const std::string & file )
     cctagLineParse( str.begin(), str.end(), rr);
     if ( rr.size() )
     {
-      _markers.push_back( rr );
+      _markers.push_back( std::move(rr) );
     }
   }
   input.close();

@@ -12,10 +12,10 @@
 #include <cctag/utils/Singleton.hpp>
 #include <cctag/CCTag.hpp>
 
-#include <boost/ptr_container/ptr_map.hpp>
 #include <boost/archive/text_oarchive.hpp>
 
 #include <fstream>
+#include <map>
 #include <string>
 #include <sstream>
 
@@ -39,7 +39,7 @@ namespace cctag {
             MAKE_SINGLETON_WITHCONSTRUCTORS(CCTagFileDebug)
 
         public:
-            using Sessions = boost::ptr_map<std::string, std::stringstream>;
+            using Sessions = std::map<std::string, std::stringstream>;
         public:
 
             void setPath(const std::string& folderName);

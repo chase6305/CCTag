@@ -7,7 +7,6 @@
  */
 #include "CmdLine.hpp"
 #include "cctag/Detection.hpp"
-#include "cctag/utils/Exceptions.hpp"
 #include "cctag/utils/FileDebug.hpp"
 #include "cctag/utils/VisualDebug.hpp"
 
@@ -16,13 +15,11 @@
 #include "cctag/cuda/device_prop.hpp"
 #endif // CCTAG_WITH_CUDA
 
-#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/math/constants/constants.hpp>
+#include <cctag/utils/Math.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
-#include <boost/timer/timer.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/types_c.h>
 #include <opencv2/opencv.hpp>
@@ -34,6 +31,9 @@
 
 #include <tbb/tbb.h>
 
+#include <algorithm>
+#include <cctype>
+#include <chrono>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -79,7 +79,7 @@ void drawMarkers(const boost::ptr_list<CCTag>& markers, cv::Mat& image, bool sho
             cv::ellipse(image,
                         center,
                         cv::Size(rescaledOuterEllipse.a(), rescaledOuterEllipse.b()),
-                        rescaledOuterEllipse.angle() * 180 / boost::math::constants::pi<double>(),
+                        rescaledOuterEllipse.angle() * 180 / cctag::numerical::pi<double>(),
                         0,
                         360,
                         color,
@@ -122,7 +122,7 @@ void detection(std::size_t frameId,
     }
 
     // Process markers detection
-    boost::timer::cpu_timer t;
+    const auto start = std::chrono::steady_clock::now();
 
     CCTagVisualDebug::instance().initBackgroundImage(src);
     CCTagVisualDebug::instance().setImageFileName(debugFileName);
@@ -143,7 +143,8 @@ void detection(std::size_t frameId,
     CCTagVisualDebug::instance().outPutAllSessions();
     CCTagVisualDebug::instance().clearSessions();
 
-    std::cout << "Total time: " << t.format() << std::endl;
+    const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start);
+    std::cout << "Total time: " << elapsed.count() << "s wall" << std::endl;
     CCTAG_COUT_NOENDL("Id : ");
 
     std::size_t counter = 0;
@@ -291,7 +292,7 @@ int main(int argc, char** argv)
 
     bfs::path myPath(bfs::absolute(cmdline._filename));
     std::string ext(myPath.extension().string());
-    boost::algorithm::to_lower(ext);
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char ch) { return std::tolower(ch); });
 
     const bfs::path parentPath(myPath.parent_path());
     std::string outputFileName;
