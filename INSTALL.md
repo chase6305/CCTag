@@ -37,6 +37,7 @@ A standalone `vcpkg install` still includes both features by default. Use
 `vcpkg install --x-no-default-features` for library dependencies only, adding
 `--x-feature=apps` or `--x-feature=tests` when needed. When CCTag is embedded
 with `add_subdirectory`, the parent project controls vcpkg feature selection.
+External manifests also retain their own feature selection.
 
 The installed `CCTag::CCTag` target propagates the C++17 requirement. Rebuild
 consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,

@@ -6,7 +6,13 @@ include(ExternalProject)
 
 # Select vcpkg dependencies before its toolchain runs inside project().
 # Both build options default to ON below; honor explicit choices here.
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+get_filename_component(_cctag_source_dir "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+set(_cctag_manifest_dir "${_cctag_source_dir}")
+if(DEFINED VCPKG_MANIFEST_DIR)
+  get_filename_component(_cctag_manifest_dir "${VCPKG_MANIFEST_DIR}" REALPATH)
+endif()
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
+   AND _cctag_manifest_dir STREQUAL _cctag_source_dir)
   if(NOT DEFINED VCPKG_MANIFEST_NO_DEFAULT_FEATURES)
     set(VCPKG_MANIFEST_NO_DEFAULT_FEATURES ON)
   endif()
