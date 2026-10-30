@@ -21,7 +21,7 @@ Note: On Windows, there are compatibility issues to build the GPU part due to co
 
 Most of the dependencies can be installed from the common repositories (apt, yum etc):
 
-* Eigen3 (libeigen3-dev) >= 3.3.4  (NOTE: in order to have Cuda support on Windows, at least version 3.3.9 is required)
+* Eigen3 (libeigen3-dev) >= 3.3.9
 * Boost >= 1.66 ([exception, program-options, ptr-container, serialization, spirit, stacktrace, test]-dev)
 * OpenCV >= 3.1
 * TBB >= 2021.5.0

@@ -32,18 +32,13 @@ Software
 
 CCTag depends on the following libraries:
 
-* Eigen3  >= 3.3.4
+* Eigen3  >= 3.3.9
 
 * Boost >= 1.66
 
 * OpenCV >= 3.1
 
 * TBB >= 2021.5.0
-
-.. warning::
-
-   In order to have Cuda support on Windows, at least Eigen 3.3.9 is required
-
 
 ------------
 
