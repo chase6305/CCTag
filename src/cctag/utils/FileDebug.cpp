@@ -9,6 +9,8 @@
 #include <cctag/CCTagFlowComponent.hpp>
 #include <cctag/DataSerialization.hpp>
 
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/nvp.hpp>
 #include <filesystem>
 
 namespace bfs = std::filesystem;

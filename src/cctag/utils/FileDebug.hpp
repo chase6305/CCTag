@@ -12,7 +12,6 @@
 #include <cctag/utils/Singleton.hpp>
 #include <cctag/CCTag.hpp>
 
-#include <boost/archive/text_oarchive.hpp>
 
 #include <fstream>
 #include <map>

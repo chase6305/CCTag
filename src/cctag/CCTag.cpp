@@ -8,6 +8,9 @@
 #include <cctag/CCTag.hpp>
 #include <cctag/utils/Defines.hpp>
 #include <cctag/DataSerialization.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/nvp.hpp>
+#include <boost/serialization/serialization.hpp>
 #include <cctag/geometry/Ellipse.hpp>
 #include <cctag/Statistic.hpp>
 #include <cctag/algebra/matrix/Operation.hpp>
