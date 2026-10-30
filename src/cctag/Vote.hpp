@@ -18,9 +18,11 @@
 
 #include <cstddef>
 #include <list>
+#include <limits>
 #include <utility>
 #include <vector>
 
+namespace cv { class Mat; }
 
 namespace cctag {
 

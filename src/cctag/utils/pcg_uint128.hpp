@@ -38,6 +38,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cassert>
 #include <climits>
 #include <utility>
@@ -494,7 +495,7 @@ bitcount_t flog2(const uint_x4<U,V>& v)
              continue;
         return flog2(v.wa[i]) + (sizeof(U)*CHAR_BIT)*i;
     }
-    abort();
+    std::abort();
 }
 
 template<typename U, typename V>
