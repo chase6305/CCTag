@@ -17,7 +17,7 @@
 
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <cctag/utils/Math.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <opencv2/core/core.hpp>
@@ -44,7 +44,7 @@
 
 using namespace cctag;
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 /**
  * @brief Check if a string is an integer number.
@@ -484,9 +484,8 @@ int main(int argc, char** argv)
 
         std::vector<bfs::path> vFileInFolder;
 
-        std::copy(bfs::directory_iterator(myPath),
-                  bfs::directory_iterator(),
-                  std::back_inserter(vFileInFolder)); // is directory_entry, which is
+        for(const auto& entry : bfs::directory_iterator(myPath))
+            vFileInFolder.push_back(entry.path());
         std::sort(vFileInFolder.begin(), vFileInFolder.end());
 
         std::size_t frameId = 0;

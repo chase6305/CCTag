@@ -65,7 +65,7 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
   list(APPEND CUDA_NVCC_FLAGS   -Xcompiler ${CCTAG_MVSC_LINKER})
 endif()
 
-set(CCTAG_CXX_STANDARD 14)
+set(CCTAG_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD ${CCTAG_CXX_STANDARD})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD ${CCTAG_CXX_STANDARD})
@@ -112,7 +112,7 @@ endif(APPLE)
 # FIND BOOST
 # list only components that are not header-only, those have a target associated
 # the header-only components must be added with target_include_directories( ... ${Boost_INCLUDE_DIRS} )
-set(BOOST_REQUIRED_COMPONENTS "filesystem;serialization")
+set(BOOST_REQUIRED_COMPONENTS "serialization")
 # Keep application and test dependencies out of the installed package requirements.
 set(BOOST_BUILD_COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
 if(CCTAG_BUILD_TESTS)
@@ -132,7 +132,7 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 if(CCTAG_WITH_CUDA)
-  set(CCTAG_MIN_CUDA_VERSION 9.0)
+  set(CCTAG_MIN_CUDA_VERSION 11.0)
   message( STATUS "Try finding CUDA" )
   if(BUILD_SHARED_LIBS)
     message(STATUS "BUILD_SHARED_LIBS ON")

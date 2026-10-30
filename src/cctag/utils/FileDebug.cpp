@@ -9,9 +9,9 @@
 #include <cctag/CCTagFlowComponent.hpp>
 #include <cctag/DataSerialization.hpp>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace cctag
 {

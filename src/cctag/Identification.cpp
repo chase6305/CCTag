@@ -21,9 +21,7 @@
 #include "cctag/cuda/tag.h"
 #endif
 
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/mean.hpp>
-#include <boost/accumulators/statistics/variance.hpp>
+#include <cctag/utils/Statistics.hpp>
 #include <cassert>
 
 #include <cmath>
@@ -56,7 +54,6 @@ bool orazioDistanceRobust(
   assert( cuts.size() > 0 );
 
   using namespace cctag::numerical;
-  using namespace boost::accumulators;
 
   using MapT = std::map<float, MarkerID>;
 
@@ -88,20 +85,20 @@ bool orazioDistanceRobust(
       const std::vector<float> & imgSig = cut.imgSignal();
 
       // compute some statitics
-      accumulator_set< float, features< /*tag::median,*/ tag::variance > > acc;
+      RunningMeanVariance<> acc;
       // Put the image signal into the accumulator
       acc = std::for_each( imgSig.begin()+30, imgSig.end(), acc ); // todo@Lilian +30
 
       // Mean
-      const float medianSig = boost::accumulators::mean( acc );
+      const float medianSig = acc.mean();
       
       // or median
       //const float medianSig = computeMedian( imgSig );
 
-      const float varSig = boost::accumulators::variance( acc );
+      const float varSig = acc.variance();
 
-      accumulator_set< float, features< tag::mean > > accInf;
-      accumulator_set< float, features< tag::mean > > accSup;
+      RunningMean accInf;
+      RunningMean accSup;
       
       bool doAccumulate = false;
       for(float i : imgSig)
@@ -117,8 +114,8 @@ bool orazioDistanceRobust(
             accSup( i );
         }
       }
-      const float muw = boost::accumulators::mean( accSup );
-      const float mub = boost::accumulators::mean( accInf );
+      const float muw = accSup.mean();
+      const float mub = accInf.mean();
 
       // Find the nearest ID in rrBank
       const float stepX = (cut.endSig() - cut.beginSig()) / ( imgSig.size() - 1.f );
@@ -546,7 +543,6 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
         const float scale,
         const size_t numSamplesOuterEdgePointsRefinement)
 {
-  using namespace boost::accumulators;
   using namespace cctag::numerical;
 
   selectSize = std::min( selectSize, collectedCuts.size() );
@@ -555,9 +551,9 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
   varCuts.reserve(collectedCuts.size());
   for( const cctag::ImageCut & cut : collectedCuts )
   {
-    accumulator_set< float, features< tag::variance > > acc;
+    RunningMeanVariance<> acc;
     acc = std::for_each( cut.imgSignal().begin(), cut.imgSignal().end(), acc );
-    varCuts.push_back( variance( acc ) );
+    varCuts.push_back( acc.variance() );
   }
   
   const float varMax = *std::max_element(varCuts.begin(),varCuts.end());

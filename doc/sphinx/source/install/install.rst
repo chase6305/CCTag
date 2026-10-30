@@ -90,11 +90,11 @@ Required tools:
 
 * CMake >= 3.14 to build the code
 * Git
-* C/C++ compiler supporting the C++14 standard (gcc >= 5, clang >= 3.4, msvc >= 2017)
+* C/C++ compiler supporting the C++17 standard and std::filesystem (GCC >= 9, Clang with a C++17 filesystem library, or Visual Studio >= 2019)
 
 Optional tool:
 
-* CUDA >= 9.0
+* CUDA >= 11.0
 
 
 .. note::
@@ -115,12 +115,7 @@ To install the dependencies:
 .. code:: shell
 
   vcpkg install
-          boost-accumulators
-          boost-array
-          boost-assert
-          boost-container
           boost-exception
-          boost-filesystem
           boost-ptr-container
           boost-program-options
           boost-serialization

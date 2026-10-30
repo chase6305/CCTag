@@ -8,16 +8,11 @@
   "documentation": "https://cctag.readthedocs.io/",
   "license": "MPL-2.0",
   "dependencies": [
-    "boost-accumulators",
-    "boost-array",
-    "boost-assert",
     {
       "name": "boost-config",
       "version>=": "1.91.0"
     },
-    "boost-container",
     "boost-exception",
-    "boost-filesystem",
     "boost-program-options",
     "boost-ptr-container",
     "boost-serialization",

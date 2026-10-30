@@ -8,13 +8,13 @@ Required tools:
 
 * CMake >= 3.14 to build the code
 * Git
-* C/C++ compiler with C++14 support
+* C/C++ compiler with C++17 and `std::filesystem` support
   * see here: <https://en.cppreference.com/w/cpp/compiler_support>
-  * TLDR gcc >= 5, clang >= 3.4, msvc >= 2017
+  * GCC >= 9, Clang with a C++17 filesystem library, or Visual Studio >= 2019
 
 Optional tool:
 
-* CUDA >= 9.0
+* CUDA >= 11.0
 Note: On Windows, there are compatibility issues to build the GPU part due to conflicts between msvc/nvcc/thrust/eigen/boost.
 
 ### Dependencies
@@ -22,9 +22,15 @@ Note: On Windows, there are compatibility issues to build the GPU part due to co
 Most of the dependencies can be installed from the common repositories (apt, yum etc):
 
 * Eigen3 (libeigen3-dev) >= 3.3.4  (NOTE: in order to have Cuda support on Windows, at least version 3.3.9 is required)
-* Boost >= 1.66 ([accumulators, array, assert, container, exception, filesystem, program-options, ptr-container, serialization, spirit, stacktrace, test]-dev)
+* Boost >= 1.66 ([exception, program-options, ptr-container, serialization, spirit, stacktrace, test]-dev)
 * OpenCV >= 3.1
 * TBB >= 2021.5.0
+
+The installed `CCTag::CCTag` target propagates the C++17 requirement. Rebuild
+consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,
+`CCTag::radiusRatiosInit()` and `Color` use `std::array`, and the edge-linking
+helper uses `std::unordered_set`. The detection API's owning pointer containers
+and serialized XML format are retained.
 
 ----------
 
@@ -57,10 +63,11 @@ cmake .. -DCCTag_DIR=$CCTAG_INSTALL/lib/cmake/CCTag/
 A docker image can be built using the Ubuntu based [Dockerfile](Dockerfile),which is based on nvidia/cuda image (<https://hub.docker.com/r/nvidia/cuda/>)
 
 A parameter `CUDA_TAG` can be passed when building the image to select the ubuntu and cuda version.
-For example to create a ubuntu 16.04 with cuda 8.0 for development, use
+First build the dependency image, then build CCTag with the same CUDA and Ubuntu versions:
 
 ```bash
-docker build --build-arg CUDA_TAG=8.0-devel --tag cctag .
+docker build -f Dockerfile_deps --tag alicevision/cctag-deps:cuda11.8.0-ubuntu20.04 .
+docker build --tag cctag .
 ```
 
 The complete list of available tags can be found on the nvidia [dockerhub page](https://hub.docker.com/r/nvidia/cuda/)

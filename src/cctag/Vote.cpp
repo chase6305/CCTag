@@ -21,7 +21,6 @@
 #include <cctag/utils/VisualDebug.hpp>
 
 #include <cctag/utils/Math.hpp>
-#include <boost/container/flat_set.hpp>
 
 #include <deque>
 #include <array>
@@ -247,7 +246,7 @@ void vote(EdgePointCollection& edgeCollection,
     void edgeLinking(EdgePointCollection& edgeCollection, std::list<EdgePoint*>& convexEdgeSegment, EdgePoint* pmax,
             std::size_t windowSizeOnInnerEllipticSegment, float averageVoteMin) {
         
-        boost::container::flat_set<unsigned int> processed; // (x,y) packed in 32 bits
+        std::unordered_set<unsigned int> processed; // (x,y) packed in 32 bits
         if (pmax) {
             // Add current max point
             convexEdgeSegment.push_back(pmax);
@@ -262,7 +261,7 @@ void vote(EdgePointCollection& edgeCollection,
     }
     
     void edgeLinkingDir(EdgePointCollection& edgeCollection,
-                        boost::container::flat_set<unsigned int>& processed,
+                        std::unordered_set<unsigned int>& processed,
                         const EdgePoint* p,
                         int dir,
                         std::list<EdgePoint*>& convexEdgeSegment,

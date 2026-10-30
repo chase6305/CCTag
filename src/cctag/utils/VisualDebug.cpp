@@ -8,7 +8,7 @@
 #include <cctag/utils/VisualDebug.hpp>
 #include <cctag/utils/FileDebug.hpp>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <cctag/utils/Math.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -16,7 +16,7 @@
 #include <opencv2/imgproc/imgproc_c.h>
 #endif
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace cctag
 {
@@ -25,7 +25,7 @@ CCTagVisualDebug::CCTagVisualDebug() = default;
 
 CCTagVisualDebug::~CCTagVisualDebug() = default;
 
-void CCTagVisualDebug::initializeFolders(const boost::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns)
+void CCTagVisualDebug::initializeFolders(const std::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns)
 {
 #ifdef CCTAG_SERIALIZE
   // Create inputImagePath/result if it does not exist
