@@ -110,21 +110,19 @@ vcpkg
 
 vcpkg can be used to install all the dependencies on all the supported platforms.
 This is particularly useful on Windows.
-To install the dependencies:
+Run the following from the CCTag source directory to install the manifest dependencies:
 
 .. code:: shell
 
   vcpkg install
-          boost-exception
-          boost-ptr-container
-          boost-program-options
-          boost-serialization
-          boost-spirit
-          boost-stacktrace
-          boost-test
-          opencv
-          tbb
-          eigen3
+
+Applications and tests are included by default. Use
+:code:`vcpkg install --x-no-default-features` for library dependencies only,
+adding :code:`--x-feature=apps` or :code:`--x-feature=tests` when needed.
+When configuring CCTag directly with the vcpkg CMake toolchain,
+:code:`CCTAG_BUILD_APPS` and :code:`CCTAG_BUILD_TESTS` select these features
+before dependency installation. An embedding parent project controls its own
+vcpkg feature selection.
 
 You can add the flag :code:`--triplet` to specify the architecture and the version you want to build.
 For example:
@@ -280,13 +278,13 @@ We provide a :code:`Dockerfile_deps` containing a cuda image with all the necess
 
 A parameter :code:`CUDA_TAG` can be passed when building the image to select the cuda version.
 Similarly, :code:`OS_TAG` can be passed to select the Ubuntu version.
-By default, :code:`CUDA_TAG=10.2` and :code:`OS_TAG=18.04`
+By default, :code:`CUDA_TAG=11.8.0` and :code:`OS_TAG=20.04`.
 
-For example to create the dependency image based on ubuntu 18.04 with cuda 8.0 for development, use
+For example, to create the dependency image with these defaults, use
 
 .. code:: shell
 
-    docker build --build-arg CUDA_TAG=8.0 --tag alicevision/cctag-deps:cuda8.0-ubuntu18.04 -f Dockerfile_deps .
+    docker build --tag alicevision/cctag-deps:cuda11.8.0-ubuntu20.04 -f Dockerfile_deps .
 
 The complete list of available tags can be found on the nvidia `dockerhub page <https://hub.docker.com/r/nvidia/cuda/>`_
 
@@ -298,7 +296,7 @@ Once you built the dependency image, you can build the cctag image in the same m
 
 .. code:: shell
 
-    docker build --tag alicevision/cctag:cuda8.0-ubuntu18.04 .
+    docker build --tag alicevision/cctag:cuda11.8.0-ubuntu20.04 .
 
 
 Running the CCTag image
@@ -309,7 +307,7 @@ Once installed, the docker can be run, e.g., in interactive mode with
 
 .. code:: shell
 
-    docker run -it --runtime=nvidia alicevision/cctag:cuda8.0-ubuntu18.04
+    docker run -it --runtime=nvidia alicevision/cctag:cuda11.8.0-ubuntu20.04
 
 
 Official images on DockeHub
