@@ -35,7 +35,10 @@
     "tests": {
       "description": "Build the unit tests",
       "dependencies": [
-        "boost-test"
+        {
+          "name": "doctest",
+          "version>=": "2.5.3"
+        }
       ]
     }
   }

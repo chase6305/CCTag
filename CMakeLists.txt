@@ -136,9 +136,9 @@ set(BOOST_REQUIRED_COMPONENTS "serialization")
 # Keep application and test dependencies out of the installed package requirements.
 set(BOOST_BUILD_COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
 if(CCTAG_BUILD_TESTS)
-  list(APPEND BOOST_BUILD_COMPONENTS unit_test_framework)
+  find_package(doctest 2.4.11 CONFIG REQUIRED)
   enable_testing()
-  include(BoostTestHelper)
+  include(CCTagTestHelper)
 endif()
 
 find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_BUILD_COMPONENTS})

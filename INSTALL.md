@@ -22,11 +22,12 @@ Note: On Windows, there are compatibility issues to build the GPU part due to co
 Most of the dependencies can be installed from the common repositories (apt, yum etc):
 
 * Eigen3 (libeigen3-dev) >= 3.3.9
-* Boost >= 1.66 ([exception, program-options, ptr-container, serialization, spirit, stacktrace, test]-dev)
+* Boost >= 1.66 ([exception, program-options, ptr-container, serialization, spirit, stacktrace]-dev)
 * OpenCV >= 3.1
 * TBB >= 2021.5.0
+* [doctest](https://github.com/doctest/doctest) >= 2.4.11 (unit tests only)
 
-Boost.ProgramOptions is needed only for applications, and Boost.Test only for
+Boost.ProgramOptions is needed only for applications, and doctest only for
 unit tests. When configuring CCTag directly with the vcpkg toolchain,
 `CCTAG_BUILD_APPS` and `CCTAG_BUILD_TESTS` select the corresponding manifest
 features before dependency installation. Set both options to `OFF` to install
@@ -38,6 +39,19 @@ A standalone `vcpkg install` still includes both features by default. Use
 `--x-feature=apps` or `--x-feature=tests` when needed. When CCTag is embedded
 with `add_subdirectory`, the parent project controls vcpkg feature selection.
 External manifests also retain their own feature selection.
+
+If your package manager provides an older doctest, install a compatible release
+from source, or set `CCTAG_BUILD_TESTS=OFF`:
+
+```bash
+git clone --depth 1 --branch v2.5.3 https://github.com/doctest/doctest.git
+cmake -S doctest -B doctest/build -DDOCTEST_WITH_TESTS=OFF \
+  -DDOCTEST_WITH_MAIN_IN_STATIC_LIB=OFF -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --install doctest/build
+```
+
+Add the install prefix to `CMAKE_PREFIX_PATH` when configuring CCTag. The installed
+CCTag package does not require doctest.
 
 The installed `CCTag::CCTag` target propagates the C++17 requirement. Rebuild
 consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,

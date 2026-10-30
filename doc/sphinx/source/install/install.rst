@@ -40,6 +40,12 @@ CCTag depends on the following libraries:
 
 * TBB >= 2021.5.0
 
+* doctest >= 2.4.11 (unit tests only)
+
+Applications use Boost.ProgramOptions. Unit tests use doctest; see
+``INSTALL.md`` for installing it from source when the system package is older.
+Set :code:`CCTAG_BUILD_TESTS=OFF` to build without the test framework.
+
 ------------
 
 CCTag can be installed from the following package managers.

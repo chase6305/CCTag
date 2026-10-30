@@ -50,8 +50,10 @@ jobs:
 
     - name: Set up vcpkg
       uses: lukka/run-vcpkg@v11
-      # vcpkgGitCommitId is intentionally omitted: run-vcpkg reads the commit
-      # hash from the builtin-baseline field in vcpkg.json automatically.
+      with:
+        # Keep dependency baselines unchanged while providing the version
+        # database needed by the pinned doctest test dependency.
+        vcpkgGitCommitId: 'd186940b2f0c4e8e5b4ff804af57d2a26fbfa091'
 
     - name: Build (${{ matrix.config }})
       uses: lukka/run-cmake@v10

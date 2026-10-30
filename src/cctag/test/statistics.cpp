@@ -3,34 +3,34 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#define BOOST_TEST_MODULE statistics
-#include <boost/test/unit_test.hpp>
+#include <doctest/doctest.h>
 #include <cctag/utils/Statistics.hpp>
 #include <cmath>
+#include <initializer_list>
 
-BOOST_AUTO_TEST_SUITE(test_statistics)
+TEST_SUITE("test_statistics") {
 
-BOOST_AUTO_TEST_CASE(empty_and_single_sample)
+TEST_CASE("empty_and_single_sample")
 {
     cctag::numerical::RunningMean mean;
     cctag::numerical::RunningMeanVariance<> incremental;
     cctag::numerical::RunningMeanVariance<false> summed;
-    BOOST_CHECK(std::isnan(mean.mean()));
-    BOOST_CHECK(std::isnan(summed.mean()));
-    BOOST_CHECK_EQUAL(incremental.mean(), 0.f);
-    BOOST_CHECK_EQUAL(incremental.variance(), 0.f);
-    BOOST_CHECK_EQUAL(summed.variance(), 0.f);
+    CHECK_UNARY(std::isnan(mean.mean()));
+    CHECK_UNARY(std::isnan(summed.mean()));
+    CHECK_EQ(incremental.mean(), 0.f);
+    CHECK_EQ(incremental.variance(), 0.f);
+    CHECK_EQ(summed.variance(), 0.f);
     mean(42.f);
     incremental(42.f);
     summed(42.f);
-    BOOST_CHECK_EQUAL(mean.mean(), 42.f);
-    BOOST_CHECK_EQUAL(incremental.mean(), 42.f);
-    BOOST_CHECK_EQUAL(summed.mean(), 42.f);
-    BOOST_CHECK_EQUAL(incremental.variance(), 0.f);
-    BOOST_CHECK_EQUAL(summed.variance(), 0.f);
+    CHECK_EQ(mean.mean(), 42.f);
+    CHECK_EQ(incremental.mean(), 42.f);
+    CHECK_EQ(summed.mean(), 42.f);
+    CHECK_EQ(incremental.variance(), 0.f);
+    CHECK_EQ(summed.variance(), 0.f);
 }
 
-BOOST_AUTO_TEST_CASE(population_variance)
+TEST_CASE("population_variance")
 {
     cctag::numerical::RunningMeanVariance<> incremental;
     cctag::numerical::RunningMeanVariance<false> summed;
@@ -39,13 +39,13 @@ BOOST_AUTO_TEST_CASE(population_variance)
         incremental(value);
         summed(value);
     }
-    BOOST_CHECK_EQUAL(incremental.mean(), 5.f);
-    BOOST_CHECK_EQUAL(summed.mean(), 5.f);
-    BOOST_CHECK_CLOSE(incremental.variance(), 4.f, 0.0001f);
-    BOOST_CHECK_CLOSE(summed.variance(), 4.f, 0.0001f);
+    CHECK_EQ(incremental.mean(), 5.f);
+    CHECK_EQ(summed.mean(), 5.f);
+    CHECK_UNARY(std::abs(incremental.variance() - 4.f) <= 4e-6f);
+    CHECK_UNARY(std::abs(summed.variance() - 4.f) <= 4e-6f);
 }
 
-BOOST_AUTO_TEST_CASE(mean_rounding_modes)
+TEST_CASE("mean_rounding_modes")
 {
     cctag::numerical::RunningMean mean;
     cctag::numerical::RunningMeanVariance<> incremental;
@@ -56,10 +56,10 @@ BOOST_AUTO_TEST_CASE(mean_rounding_modes)
         incremental(value);
         summed(value);
     }
-    BOOST_CHECK_EQUAL(mean.mean(), -0x1.5ca5c4p+9f);
-    BOOST_CHECK_EQUAL(summed.mean(), mean.mean());
+    CHECK_EQ(mean.mean(), -0x1.5ca5c4p+9f);
+    CHECK_EQ(summed.mean(), mean.mean());
     // Incremental averaging rounds at each step, rather than only at the end.
-    BOOST_CHECK_EQUAL(incremental.mean(), -0x1.5ca5c8p+9f);
+    CHECK_EQ(incremental.mean(), -0x1.5ca5c8p+9f);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+} // TEST_SUITE

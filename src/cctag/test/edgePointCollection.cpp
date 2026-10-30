@@ -1,7 +1,5 @@
-#define BOOST_TEST_MODULE testEdgePointCollection
-#define BOOST_TEST_DYN_LINK
 
-#include <boost/test/unit_test.hpp>
+#include <doctest/doctest.h>
 #include <cctag/Types.hpp>
 
 #include <algorithm>
@@ -34,9 +32,9 @@ void* operator new[](std::size_t size)
 void operator delete[](void* memory) noexcept { std::free(memory); }
 void operator delete[](void* memory, std::size_t) noexcept { std::free(memory); }
 
-BOOST_AUTO_TEST_SUITE(test_edgePointCollection)
+TEST_SUITE("test_edgePointCollection") {
 
-BOOST_AUTO_TEST_CASE(processed_flags_start_clear_in_reused_storage)
+TEST_CASE("processed_flags_start_clear_in_reused_storage")
 {
     struct PoisonGuard
     {
@@ -55,12 +53,12 @@ BOOST_AUTO_TEST_CASE(processed_flags_start_clear_in_reused_storage)
 
     for(int i = 0; i < 64; ++i)
     {
-        BOOST_CHECK(!points->test_processed_in((*points)(i)));
-        BOOST_CHECK(!points->test_processed_aux((*points)(i)));
+        CHECK_UNARY(!points->test_processed_in((*points)(i)));
+        CHECK_UNARY(!points->test_processed_aux((*points)(i)));
     }
 }
 
-BOOST_AUTO_TEST_CASE(processed_flags_are_independent_across_word_boundaries)
+TEST_CASE("processed_flags_are_independent_across_word_boundaries")
 {
     cctag::EdgePointCollection points(8, 8);
     for(int y = 0; y < 8; ++y)
@@ -74,8 +72,8 @@ BOOST_AUTO_TEST_CASE(processed_flags_are_independent_across_word_boundaries)
     }
     for(int i = 0; i < 64; ++i)
     {
-        BOOST_CHECK_EQUAL(points.test_processed_in(points(i)), i % 2 == 0);
-        BOOST_CHECK_EQUAL(points.test_processed_aux(points(i)), i % 3 == 0);
+        CHECK_EQ(points.test_processed_in(points(i)), i % 2 == 0);
+        CHECK_EQ(points.test_processed_aux(points(i)), i % 3 == 0);
     }
     for(int i = 0; i < 64; ++i)
     {
@@ -84,12 +82,12 @@ BOOST_AUTO_TEST_CASE(processed_flags_are_independent_across_word_boundaries)
     }
     for(int i = 0; i < 64; ++i)
     {
-        BOOST_CHECK(!points.test_processed_in(points(i)));
-        BOOST_CHECK(!points.test_processed_aux(points(i)));
+        CHECK_UNARY(!points.test_processed_in(points(i)));
+        CHECK_UNARY(!points.test_processed_aux(points(i)));
     }
 }
 
-BOOST_AUTO_TEST_CASE(small_images_avoid_maximum_camera_buffers)
+TEST_CASE("small_images_avoid_maximum_camera_buffers")
 {
     struct TrackGuard
     {
@@ -101,10 +99,10 @@ BOOST_AUTO_TEST_CASE(small_images_avoid_maximum_camera_buffers)
         TrackGuard guard;
         points.reset(new cctag::EdgePointCollection(8, 8));
     }
-    BOOST_CHECK_LT(arrayBytes, 64u * 1024u);
+    CHECK_LT(arrayBytes, 64u * 1024u);
 }
 
-BOOST_AUTO_TEST_CASE(voter_lists_use_all_points_and_can_be_replaced)
+TEST_CASE("voter_lists_use_all_points_and_can_be_replaced")
 {
     cctag::EdgePointCollection points(8, 8);
     std::vector<std::vector<int>> voters(64);
@@ -117,21 +115,21 @@ BOOST_AUTO_TEST_CASE(voter_lists_use_all_points_and_can_be_replaced)
     for(int i = 0; i < 64; ++i)
     {
         const auto list = points.voters(points(i));
-        BOOST_REQUIRE_EQUAL(points.voters_size(points(i)), 2);
-        BOOST_CHECK_EQUAL(list.first[0], i);
-        BOOST_CHECK_EQUAL(list.first[1], (i + 1) % 64);
+        REQUIRE_EQ(points.voters_size(points(i)), 2);
+        CHECK_EQ(list.first[0], i);
+        CHECK_EQ(list.first[1], (i + 1) % 64);
     }
     points.create_voter_lists(std::vector<std::vector<int>>(64));
     for(int i = 0; i < 64; ++i)
-        BOOST_CHECK_EQUAL(points.voters_size(points(i)), 0);
+        CHECK_EQ(points.voters_size(points(i)), 0);
 }
 
-BOOST_AUTO_TEST_CASE(empty_and_overflowing_image_sizes)
+TEST_CASE("empty_and_overflowing_image_sizes")
 {
     cctag::EdgePointCollection empty(0, 0);
-    BOOST_CHECK_EQUAL(empty.get_point_count(), 0);
-    BOOST_CHECK_NO_THROW(empty.create_voter_lists({}));
-    BOOST_CHECK_THROW(cctag::EdgePointCollection(std::numeric_limits<std::size_t>::max(), 2), std::length_error);
+    CHECK_EQ(empty.get_point_count(), 0);
+    CHECK_NOTHROW(empty.create_voter_lists({}));
+    CHECK_THROWS_AS(cctag::EdgePointCollection(std::numeric_limits<std::size_t>::max(), 2), std::length_error);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+} // TEST_SUITE

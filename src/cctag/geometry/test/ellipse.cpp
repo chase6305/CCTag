@@ -1,8 +1,6 @@
-#define BOOST_TEST_MODULE testEllipse
 
-#define BOOST_TEST_DYN_LINK
 
-#include <boost/test/unit_test.hpp>
+#include <doctest/doctest.h>
 
 #include <cctag/geometry/Point.hpp>
 #include <cctag/geometry/Ellipse.hpp>
@@ -14,18 +12,18 @@
 
 using Point3f = cctag::Point2d<Eigen::Vector3f>;
 
-BOOST_AUTO_TEST_SUITE(test_ellipse)
+TEST_SUITE("test_ellipse") {
 
-BOOST_AUTO_TEST_CASE(test_pixel_distance_avoids_integer_square_overflow)
+TEST_CASE("test_pixel_distance_avoids_integer_square_overflow")
 {
     using Point3i = cctag::Point2d<Eigen::Vector3i>;
     const Point3i a(-32760, 0);
     const Point3i b(32760, 0);
-    BOOST_CHECK_EQUAL(cctag::numerical::distancePoints2D(a, b), 65520.f);
-    BOOST_CHECK_EQUAL(cctag::numerical::distancePoints2D(Point3f(0.f, 0.f), Point3f(3.f, 4.f)), 5.f);
+    CHECK_EQ(cctag::numerical::distancePoints2D(a, b), 65520.f);
+    CHECK_EQ(cctag::numerical::distancePoints2D(Point3f(0.f, 0.f), Point3f(3.f, 4.f)), 5.f);
 }
 
-BOOST_AUTO_TEST_CASE(test_nonfinite_ellipse_coordinates_throw_before_integer_conversion)
+TEST_CASE("test_nonfinite_ellipse_coordinates_throw_before_integer_conversion")
 {
     using namespace cctag::numerical::geometry;
     Ellipse ellipse(Point3f(0.f, 0.f), 5.f, 3.f, 0.f);
@@ -33,11 +31,11 @@ BOOST_AUTO_TEST_CASE(test_nonfinite_ellipse_coordinates_throw_before_integer_con
     for(float invalid : {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()})
     {
         ellipse.center().x() = invalid;
-        BOOST_CHECK_THROW(computeIntermediatePoints(ellipse, a, b, c, d), std::runtime_error);
+        CHECK_THROWS_AS(computeIntermediatePoints(ellipse, a, b, c, d), std::runtime_error);
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_ellipse_representation)
+TEST_CASE("test_ellipse_representation")
 {
     const float aGT = 5.0f;
     const float bGT = 3.0f;
@@ -80,11 +78,11 @@ BOOST_AUTO_TEST_CASE(test_ellipse_representation)
         cctag::numerical::geometry::Ellipse el(Point3f(cxGT, cyGT), aGT, bGT, angleGT); // avoid conflict with wingdi.h on windows
 
         // checking getters
-        BOOST_CHECK(std::fabs(aGT - el.a()) < 0.00001);
-        BOOST_CHECK(std::fabs(bGT - el.b()) < 0.00001);
-        BOOST_CHECK(std::fabs(angleGT - el.angle()) < 0.00001);
-        BOOST_CHECK(std::fabs(cxGT - el.center()(0)) < 0.00001);
-        BOOST_CHECK(std::fabs(cyGT - el.center()(1)) < 0.00001);
+        CHECK_UNARY(std::fabs(aGT - el.a()) < 0.00001);
+        CHECK_UNARY(std::fabs(bGT - el.b()) < 0.00001);
+        CHECK_UNARY(std::fabs(angleGT - el.angle()) < 0.00001);
+        CHECK_UNARY(std::fabs(cxGT - el.center()(0)) < 0.00001);
+        CHECK_UNARY(std::fabs(cyGT - el.center()(1)) < 0.00001);
 
         const auto &conic = el.matrix();
 
@@ -99,16 +97,16 @@ BOOST_AUTO_TEST_CASE(test_ellipse_representation)
         for (const auto &p : pts)
         {
             const float result = p.transpose() * transform.transpose() * conic * transform * p;
-            BOOST_CHECK(std::fabs(result) < 0.001);
+            CHECK_UNARY(std::fabs(result) < 0.001);
         }
 
         // Test building the ellipse form a matrix
         cctag::numerical::geometry::Ellipse fromMatrix(conic);
 
         // major axis aligned with y-axis choice, so a and b are swapped and the angle is 90deg away
-        BOOST_CHECK(std::fabs(fromMatrix.b() - aGT) < 0.001);
-        BOOST_CHECK(std::fabs(fromMatrix.a() - bGT) < 0.001);
-        BOOST_CHECK(std::fabs(fromMatrix.angle() - angleGT) - pi_2_f < 0.001);
+        CHECK_UNARY(std::fabs(fromMatrix.b() - aGT) < 0.001);
+        CHECK_UNARY(std::fabs(fromMatrix.a() - bGT) < 0.001);
+        CHECK_UNARY(std::fabs(fromMatrix.angle() - angleGT) - pi_2_f < 0.001);
 
         // test decomposition
         Ellipse::Matrix canonic;
@@ -124,11 +122,11 @@ BOOST_AUTO_TEST_CASE(test_ellipse_representation)
             {
                 if(r == c)
                 {
-                    BOOST_CHECK(std::fabs(identity(r, c) - 1) < 0.001);
+                    CHECK_UNARY(std::fabs(identity(r, c) - 1) < 0.001);
                 }
                 else
                 {
-                    BOOST_CHECK(std::fabs(identity(r, c)) < 0.001);
+                    CHECK_UNARY(std::fabs(identity(r, c)) < 0.001);
                 }
             }
         }
@@ -139,19 +137,19 @@ BOOST_AUTO_TEST_CASE(test_ellipse_representation)
             // since the axis are inverted, invert also the points
             const Point3f point{p.y(), p.x()};
             const float result = point.transpose() * canonic  * point;
-            BOOST_CHECK(std::fabs(result) < 0.001);
+            CHECK_UNARY(std::fabs(result) < 0.001);
         }
 
         // test building from canonical form
         cctag::numerical::geometry::Ellipse fromCanonic{canonic};
-        BOOST_CHECK(std::fabs(fromCanonic.b() - aGT) < 0.001);
-        BOOST_CHECK(std::fabs(fromCanonic.a() - bGT) < 0.001);
-        BOOST_CHECK(std::fabs(fromCanonic.angle()) < 0.0001);
+        CHECK_UNARY(std::fabs(fromCanonic.b() - aGT) < 0.001);
+        CHECK_UNARY(std::fabs(fromCanonic.a() - bGT) < 0.001);
+        CHECK_UNARY(std::fabs(fromCanonic.angle()) < 0.0001);
         // in canonical form the center is the origin
-        BOOST_CHECK(std::fabs(fromCanonic.center()(0)) < 0.0001);
-        BOOST_CHECK(std::fabs(fromCanonic.center()(1)) < 0.0001);
+        CHECK_UNARY(std::fabs(fromCanonic.center()(0)) < 0.0001);
+        CHECK_UNARY(std::fabs(fromCanonic.center()(1)) < 0.0001);
     }
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+} // TEST_SUITE
 

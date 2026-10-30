@@ -55,10 +55,19 @@ WORKDIR /tmp/boost
 RUN wget https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     tar -xzf boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     cd boost_${BOOST_VERSION_FILENAME} && \
-    ./bootstrap.sh --with-libraries=program_options,serialization,test --prefix="${DEPS_INSTALL_PATH}" && \
+    ./bootstrap.sh --with-libraries=program_options,serialization --prefix="${DEPS_INSTALL_PATH}" && \
     ./b2 link=shared install && \
     cd /opt && \
     rm -rf /tmp/boost
+
+WORKDIR /tmp/doctest
+ENV DOCTEST_VERSION="2.5.3"
+RUN wget -q https://github.com/doctest/doctest/archive/refs/tags/v${DOCTEST_VERSION}.tar.gz -O doctest.tar.gz && \
+    tar xf doctest.tar.gz --strip-components=1 && \
+    cmake -S . -B build -DDOCTEST_WITH_TESTS=OFF \
+      -DDOCTEST_WITH_MAIN_IN_STATIC_LIB=OFF -DCMAKE_INSTALL_PREFIX:PATH=${DEPS_INSTALL_PATH} && \
+    cmake --install build && \
+    cd /opt && rm -rf /tmp/doctest
 
 WORKDIR /tmp/eigen
 ENV EIGEN_VERSION="3.4.0"

@@ -36,8 +36,18 @@ jobs:
       DEPS_INSTALL_DIR: /opt/
       BUILD_TYPE: ${{ matrix.build_type }}
       CTEST_OUTPUT_ON_FAILURE: 1
+      DOCTEST_VERSION: "2.5.3"
     steps:
       - uses: actions/checkout@v7
+
+      - name: Install test framework
+        run: |
+          wget -q https://github.com/doctest/doctest/archive/refs/tags/v${DOCTEST_VERSION}.tar.gz -O /tmp/doctest.tar.gz
+          tar xf /tmp/doctest.tar.gz -C /tmp
+          cmake -S /tmp/doctest-${DOCTEST_VERSION} -B /tmp/doctest-build \
+            -DDOCTEST_WITH_TESTS=OFF -DDOCTEST_WITH_MAIN_IN_STATIC_LIB=OFF \
+            -DCMAKE_INSTALL_PREFIX:PATH=${DEPS_INSTALL_DIR}
+          cmake --install /tmp/doctest-build
 
       - name: Prepare File Tree
         run: |

@@ -1,8 +1,6 @@
-#define BOOST_TEST_MODULE testFitEllipse
 
-#define BOOST_TEST_DYN_LINK
 
-#include <boost/test/unit_test.hpp>
+#include <doctest/doctest.h>
 
 #include <cctag/geometry/Point.hpp>
 #include <cctag/geometry/Ellipse.hpp>
@@ -51,9 +49,9 @@ bool fit_and_check_ellipse(const std::vector<Point3f>& pts)
     return check_pt_in_ellipse(mass_center, ellipse);
 }
 
-BOOST_AUTO_TEST_SUITE(test_ellipseFitting)
+TEST_SUITE("test_ellipseFitting") {
 
-BOOST_AUTO_TEST_CASE(test_edge_point_pointers_match_value_fitting)
+TEST_CASE("test_edge_point_pointers_match_value_fitting")
 {
     std::vector<cctag::EdgePoint> edges;
     const std::vector<Point3f> values = {
@@ -69,12 +67,12 @@ BOOST_AUTO_TEST_CASE(test_edge_point_pointers_match_value_fitting)
     cctag::numerical::geometry::Ellipse fromValues, fromPointers;
     cctag::numerical::ellipseFitting(fromValues, values);
     cctag::numerical::ellipseFitting(fromPointers, pointers);
-    BOOST_CHECK_SMALL((fromValues.matrix() - fromPointers.matrix()).norm(), 1e-6f);
+    CHECK_UNARY((fromValues.matrix() - fromPointers.matrix()).norm() <= 1e-6f);
     pointers.resize(4);
-    BOOST_CHECK_THROW(cctag::numerical::ellipseFitting(fromPointers, pointers), std::domain_error);
+    CHECK_THROWS_AS(cctag::numerical::ellipseFitting(fromPointers, pointers), std::domain_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_pixel_int)
+TEST_CASE("test_pixel_int")
 {
     std::vector<Point3f> pts;
     pts.reserve(12);
@@ -91,10 +89,10 @@ BOOST_AUTO_TEST_CASE(test_pixel_int)
     pts.emplace_back(333.f, 319.f);
     pts.emplace_back(333.f, 320.f);
 
-    BOOST_CHECK(fit_and_check_ellipse(pts));
+    CHECK_UNARY(fit_and_check_ellipse(pts));
 }
 
-BOOST_AUTO_TEST_CASE(test_pixel_int2)
+TEST_CASE("test_pixel_int2")
 {
     std::vector<Point3f> pts;
     pts.reserve(12);
@@ -111,10 +109,10 @@ BOOST_AUTO_TEST_CASE(test_pixel_int2)
     pts.emplace_back(333.f, 319.f);
     pts.emplace_back(333.f, 320.f);
 
-    BOOST_CHECK(fit_and_check_ellipse(pts));
+    CHECK_UNARY(fit_and_check_ellipse(pts));
 }
 
-BOOST_AUTO_TEST_CASE(test_float1)
+TEST_CASE("test_float1")
 {
     std::vector<Point3f> pts;
     pts.reserve(10);
@@ -129,10 +127,10 @@ BOOST_AUTO_TEST_CASE(test_float1)
     pts.emplace_back(929.145f, 744.976f);
     pts.emplace_back(917.474f, 791.823f);
 
-    BOOST_CHECK(fit_and_check_ellipse(pts));
+    CHECK_UNARY(fit_and_check_ellipse(pts));
 }
 
-BOOST_AUTO_TEST_CASE(test_float2)
+TEST_CASE("test_float2")
 {
     std::vector<Point3f> pts;
     pts.reserve(10);
@@ -147,10 +145,10 @@ BOOST_AUTO_TEST_CASE(test_float2)
     pts.emplace_back(929.145f, 744.976f);
     pts.emplace_back(917.474f, 791.823f);
 
-    BOOST_CHECK(fit_and_check_ellipse(pts));
+    CHECK_UNARY(fit_and_check_ellipse(pts));
 }
 
-BOOST_AUTO_TEST_CASE(test_withGT)
+TEST_CASE("test_withGT")
 {
     // const float aGT = 5.0f;
     // const float bGT = 3.0f;
@@ -179,14 +177,14 @@ BOOST_AUTO_TEST_CASE(test_withGT)
     pts.emplace_back( 4.7553f, -0.9271f);
     pts.emplace_back( 5.0000f, .0f);
 
-    BOOST_CHECK(fit_and_check_ellipse(pts));
+    CHECK_UNARY(fit_and_check_ellipse(pts));
 
     cctag::numerical::geometry::Ellipse ellipse;
     cctag::numerical::ellipseFitting(ellipse, pts);
 
 }
 
-BOOST_AUTO_TEST_CASE(test_throw_5points)
+TEST_CASE("test_throw_5points")
 {
     // test with 0 to 4 input point, it should throw
     for(std::size_t i = 0; i < 5; ++i)
@@ -199,12 +197,12 @@ BOOST_AUTO_TEST_CASE(test_throw_5points)
         }
         cctag::numerical::geometry::Ellipse ellipse;
 
-        BOOST_CHECK_THROW(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
+        CHECK_THROWS_AS(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
 
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_throw_degenerate_same_point)
+TEST_CASE("test_throw_degenerate_same_point")
 {
     // test with 5 times the same point, degenerate case, it should throw
     std::vector<Point3f> pts;
@@ -214,10 +212,10 @@ BOOST_AUTO_TEST_CASE(test_throw_degenerate_same_point)
         pts.emplace_back( 5.0000f, .0f);
     }
     cctag::numerical::geometry::Ellipse ellipse;
-    BOOST_REQUIRE_THROW(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
+    REQUIRE_THROWS_AS(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_throw_degenerate_aligned_points)
+TEST_CASE("test_throw_degenerate_aligned_points")
 {
     // test with 5 points on a line, it should throw
     std::vector<Point3f> pts;
@@ -228,10 +226,10 @@ BOOST_AUTO_TEST_CASE(test_throw_degenerate_aligned_points)
     pts.emplace_back( 5.0000f, 4.0f);
     pts.emplace_back( 5.0000f, 5.0f);
     cctag::numerical::geometry::Ellipse ellipse;
-    BOOST_REQUIRE_THROW(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
+    REQUIRE_THROWS_AS(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_throw_repeated_points)
+TEST_CASE("test_throw_repeated_points")
 {
     // test with 3 points and 2 of them repeated twice, it should throw
     std::vector<Point3f> pts;
@@ -262,10 +260,10 @@ BOOST_AUTO_TEST_CASE(test_throw_repeated_points)
 // TODO: This test is disabled for now as Eigen computeInverseWithCheck in "fit_solver"
 //       says that the matrix is invertible in this case and it should not be the case.
 //       See here: https://eigen.tuxfamily.org/dox/classEigen_1_1MatrixBase.html#title23
-//     BOOST_REQUIRE_THROW(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
+//     REQUIRE_THROWS_AS(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_throw_degenerate_points)
+TEST_CASE("test_throw_degenerate_points")
 {
     // test with degenerate configuration of points, must throw
     std::vector<Point3f> pts;
@@ -283,8 +281,8 @@ BOOST_AUTO_TEST_CASE(test_throw_degenerate_points)
     pts.emplace_back( -0.636353f, -4.72728f);
 
     cctag::numerical::geometry::Ellipse ellipse;
-    BOOST_REQUIRE_THROW(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
+    REQUIRE_THROWS_AS(cctag::numerical::ellipseFitting(ellipse, pts), std::domain_error);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+} // TEST_SUITE
 
