@@ -13,7 +13,7 @@ install:
     #       call cudaInstallAppveyor.cmd
     - cd C:\Tools\vcpkg
     - git pull
-    - git checkout 2022.09.27
+    - git checkout d186940b2f0c4e8e5b4ff804af57d2a26fbfa091
     - .\bootstrap-vcpkg.bat
     - cd %APPVEYOR_BUILD_FOLDER%
 
@@ -27,7 +27,7 @@ install:
           boost-serialization
           boost-spirit
           boost-stacktrace
-          boost-test
+          doctest
           opencv
           tbb
           eigen3
