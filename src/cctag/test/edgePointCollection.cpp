@@ -1,10 +1,13 @@
 
 #include <doctest/doctest.h>
 #include <cctag/Types.hpp>
+#include <cctag/Vote.hpp>
+#include <opencv2/core.hpp>
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <memory>
 #include <limits>
 #include <new>
@@ -130,6 +133,47 @@ TEST_CASE("empty_and_overflowing_image_sizes")
     CHECK_EQ(empty.get_point_count(), 0);
     CHECK_NOTHROW(empty.create_voter_lists({}));
     CHECK_THROWS_AS(cctag::EdgePointCollection(std::numeric_limits<std::size_t>::max(), 2), std::length_error);
+}
+
+TEST_CASE("voting_keeps_valid_field_lines_after_rejected_ones")
+{
+    for(unsigned crowns : {3u, 4u})
+    {
+        cv::Mat dx(16, 64, CV_16SC1, cv::Scalar(100));
+        const cv::Mat dy(16, 64, CV_16SC1, cv::Scalar(0));
+        cctag::EdgePointCollection points(64, 16);
+        const int count = 2 * crowns;
+        for(int row : {4, 8})
+            for(int i = 0; i < count; ++i)
+            {
+                // The first row has an excessive gap; the second has equal gaps.
+                const int x = 4 + 4 * i + (row == 4 && i >= 3 ? 8 : 0);
+                const short gradient = i % 2 ? 100 : -100;
+                dx.at<short>(row, x) = gradient;
+                points.add_point(x, row, gradient, 0.f);
+            }
+        points.add_point(4, 12, 100.f, 0.f);
+        cctag::Parameters params;
+        params._nCrowns = crowns;
+        params._distSearch = 16;
+        params._ratioVoting = 1.5f;
+        params._minVotesToSelectCandidate = 1;
+        std::vector<cctag::EdgePoint*> seeds;
+        cctag::vote(points, seeds, dx, dy, params);
+
+        REQUIRE_EQ(seeds.size(), 2);
+        CHECK_EQ(points(seeds[0]), 2 * count - 1);
+        CHECK_EQ(points(seeds[1]), count);
+        for(int i = 0; i < points.get_point_count(); ++i)
+        {
+            const bool winner = i == count || i == 2 * count - 1;
+            CHECK_EQ(points.voters_size(points(i)), winner ? 1 : 0);
+            CHECK_EQ(points(i)->_isMax, winner ? 1 : -1);
+            CHECK_EQ(points(i)->_flowLength, winner ? 4.f * (count - 1) : 0.f);
+            if(winner)
+                CHECK_EQ(*points.voters(points(i)).first, i == count ? 2 * count - 1 : count);
+        }
+    }
 }
 
 } // TEST_SUITE

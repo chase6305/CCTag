@@ -88,7 +88,7 @@ void vote(EdgePointCollection& edgeCollection,
 		throw std::domain_error("thrVotingAngle must be equal to 0 or edge points gradients have to be normalized.");
     }
 
-    
+    std::vector<float> vDist;
     for (int iEdgePoint = 0; iEdgePoint < pointCount; ++iEdgePoint )
     {
         EdgePoint& p = *edgeCollection(iEdgePoint);
@@ -100,7 +100,7 @@ void vote(EdgePointCollection& edgeCollection,
         EdgePoint* choosen = nullptr;
 
         // To save all sub-segments length
-        std::vector<float> vDist; ///
+        vDist.clear();
         vDist.reserve(params._nCrowns * 2 - 1);
 
         // Length of the reconstructed field line approximation between the two
@@ -464,6 +464,7 @@ void vote(EdgePointCollection& edgeCollection,
 
             std::size_t counter = 0;
             std::array<int, 5> perm;
+            std::vector<float> dist;
             while (counter < 70)
             {
                 // Random subset of 5 points from pts
@@ -509,7 +510,7 @@ void vote(EdgePointCollection& edgeCollection,
                             }
 
                             // Compute the median from the set of points pts
-                            std::vector<float> dist;
+                            dist.clear();
                             numerical::distancePointEllipse(dist, pts, q);
 
                             if (weightedType != NO_WEIGHT) // todo
@@ -612,6 +613,8 @@ void vote(EdgePointCollection& edgeCollection,
         std::array<int, 5> permutations;
         std::vector<cctag::Point2d<Eigen::Vector3f> > points;
         points.reserve(8);
+        std::vector<float> dist;
+        std::vector<float> anotherDist;
         while (cnt < 100)
         {
             points.clear(); // Capacity is kept, but the elements are all erased
@@ -651,13 +654,12 @@ void vote(EdgePointCollection& edgeCollection,
                     continue;
                 }
 
-                std::vector<float> dist;
+                dist.clear();
                 numerical::distancePointEllipse(dist, pts, q);
 
                 const float S1 = numerical::medianRef(dist);
 
-                std::vector<float> anotherDist;
-
+                anotherDist.clear();
                 numerical::distancePointEllipse(anotherDist, anotherPts, q);
 
                 const float S2 = numerical::medianRef(anotherDist);

@@ -22,6 +22,7 @@
 #endif
 
 #include <cctag/utils/Statistics.hpp>
+#include <array>
 #include <cassert>
 #include <stdexcept>
 
@@ -36,6 +37,9 @@
 
 namespace cctag {
 namespace identification {
+
+template<typename Kernel>
+static std::pair<float, float> convImageCutImpl(const Kernel& kernel, ImageCut& cut);
 
 /**
  * @brief Read and identify a 1D rectified image signal.
@@ -606,20 +610,17 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::
       return false;
     
     
-    std::vector<float> kernelA = { -0.0000f, -0.0003f, -0.1065f, -0.7863f, .0f, 0.7863f, 0.1065f, 0.0003f, 0.0000f }; // size = 9, sigma = 0.5
-    std::vector<float> kernelB = { -0.0044f, -0.0540f, -0.2376f, -0.3450f, .0f, 0.3450f, 0.2376f, 0.0540f, 0.0044f }; // size = 9, sigma = 1
-    std::vector<float> kernelC = { -0.0366f, -0.1113f, -0.1801f, -0.1594f, .0f, 0.1594f, 0.1801f, 0.1113f, 0.0366f }; // size = 9, sigma = 1.5
-
-    std::vector<std::vector<float>> vKernels;
-    vKernels.push_back(kernelA);
-    vKernels.push_back(kernelB);
-    vKernels.push_back(kernelC);
+    static constexpr std::array<std::array<float, 9>, 3> vKernels{{
+      { -0.0000f, -0.0003f, -0.1065f, -0.7863f, .0f, 0.7863f, 0.1065f, 0.0003f, 0.0000f }, // sigma = 0.5
+      { -0.0044f, -0.0540f, -0.2376f, -0.3450f, .0f, 0.3450f, 0.2376f, 0.0540f, 0.0044f }, // sigma = 1
+      { -0.0366f, -0.1113f, -0.1801f, -0.1594f, .0f, 0.1594f, 0.1801f, 0.1113f, 0.0366f } // sigma = 1.5
+    }};
     
     std::map<float,float> res;
     
     for(size_t i=0; i<3 ; ++i)
     {
-      res.insert(convImageCut(vKernels[i], cutOnOuterPoint));
+      res.insert(convImageCutImpl(vKernels[i], cutOnOuterPoint));
     }
     // Get the location of the highest peak (last element)
     float maxLocation = res.rbegin()->second;
@@ -635,7 +636,8 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::
     return true;
 }
 
-std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut)
+template<typename Kernel>
+static std::pair<float,float> convImageCutImpl(const Kernel & kernel, ImageCut & cut)
 {
   const auto& signal = cut.imgSignal();
   if(signal.empty())
@@ -668,6 +670,11 @@ std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut 
     }
   }
   return {maxValue, maxLocation};
+}
+
+std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut)
+{
+  return convImageCutImpl(kernel, cut);
 }
 
 /**
