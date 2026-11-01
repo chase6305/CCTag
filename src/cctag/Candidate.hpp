@@ -12,6 +12,7 @@
 #include <cctag/geometry/Ellipse.hpp>
 
 #include <list>
+#include <vector>
 
 namespace cctag
 {

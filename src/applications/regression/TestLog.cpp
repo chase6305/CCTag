@@ -9,7 +9,8 @@
 #include <fstream>
 #include <chrono>
 #include <stdexcept>
-#include <boost/algorithm/string.hpp>
+#include <algorithm>
+#include <cctype>
 #include <boost/serialization/vector.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
@@ -21,15 +22,26 @@
 
 using namespace cctag;
 
+namespace {
+
+bool endsWithIgnoreCase(const std::string& filename, const std::string& suffix)
+{
+  return filename.size() >= suffix.size() &&
+    std::equal(suffix.rbegin(), suffix.rend(), filename.rbegin(),
+      [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
+}
+
+}
+
 FrameLog FrameLog::detect(size_t frame, const cv::Mat& src, const Parameters& parameters,
   const cctag::CCTagMarkersBank& bank)
 {
   using namespace std::chrono;
   CCTag::List markers;
   
-  const auto t0 = high_resolution_clock::now();
+  const auto t0 = steady_clock::now();
   cctagDetection(markers, 0, frame, src, parameters, bank, true, nullptr);
-  const auto t1 = high_resolution_clock::now();
+  const auto t1 = steady_clock::now();
   const auto td = duration_cast<milliseconds>(t1 - t0).count() / 1000.f;
   
   return FrameLog(frame, td, markers);
@@ -55,14 +67,12 @@ void FileLog::load(const std::string& filename)
 
 bool FileLog::isSupportedImage(const std::string& filename)
 {
-  using namespace boost::algorithm;
-  return iends_with(filename, ".png") || iends_with(filename, ".jpg");
+  return endsWithIgnoreCase(filename, ".png") || endsWithIgnoreCase(filename, ".jpg");
 }
 
 bool FileLog::isSupportedVideo(const std::string& filename)
 {
-  using namespace boost::algorithm;
-  return iends_with(filename, ".avi");
+  return endsWithIgnoreCase(filename, ".avi");
 }
 
 bool FileLog::isSupportedFormat(const std::string& filename)

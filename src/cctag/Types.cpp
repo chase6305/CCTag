@@ -7,34 +7,38 @@
  */
 
 #include <cctag/Types.hpp>
+#include <algorithm>
+#include <cstring>
 
 namespace cctag
 {
 
-EdgePointCollection::EdgePointCollection(size_t w, size_t h) :
-  _edgeMap(new int[MAX_RESOLUTION*MAX_RESOLUTION]),
-  _edgeList(new EdgePoint[MAX_POINTS]),
-  _linkList(new int[2*MAX_POINTS]),
-  _votersIndex(new int[MAX_POINTS+CUDA_OFFSET]),
-  _votersList(new int[MAX_VOTERLIST_SIZE]),
-  _processedIn(new unsigned[MAX_POINTS/4]),
-  _processedAux(new unsigned[MAX_POINTS/4])
+namespace
 {
-  if (w*h > MAX_RESOLUTION*MAX_RESOLUTION)
-    throw std::length_error("EdgePointCollection::set_frame_size: image resolution is too large");
+size_t checkedArea(size_t w, size_t h, size_t maxArea)
+{
+  if (w != 0 && h > maxArea / w)
+    throw std::length_error("EdgePointCollection: image resolution is too large");
+  return w*h;
+}
+}
 
+EdgePointCollection::EdgePointCollection(size_t w, size_t h) :
+  _edgeMap(new int[checkedArea(w, h, MAX_RESOLUTION*MAX_RESOLUTION)]),
+  _edgeList(new EdgePoint[std::min(w*h, MAX_POINTS)]),
+  _linkList(new int[2*std::min(w*h, MAX_POINTS)]),
+  _votersIndex(new int[std::min(w*h, MAX_POINTS)+CUDA_OFFSET+1]),
+  _processedIn(new unsigned[(std::min(w*h, MAX_POINTS)+3)/4]),
+  _processedAux(new unsigned[(std::min(w*h, MAX_POINTS)+3)/4])
+{
   point_count() = 0;
   _edgeMapShape[0] = w; _edgeMapShape[1] = h;
-  memset(&_edgeMap[0], -1, w*h*sizeof(int));  // XXX@stian: unnecessary for CUDA
+  memset(_edgeMap.get(), -1, w*h*sizeof(int));  // XXX@stian: unnecessary for CUDA
   
-  if (w*h/8+4 < MAX_POINTS) {
-    memset(&_processedIn[0], 0, w*h/8+4);     // one bit per pixel + roundoff error
-    memset(&_processedAux[0], 0, w*h/8+4);    // ditto.
-  }
-  else {
-    memset(&_processedIn[0], 0, MAX_POINTS);
-    memset(&_processedAux[0], 0, MAX_POINTS);
-  }
+  // The existing flag layout stores four point indices in each unsigned word.
+  const size_t flagWords = (std::min(w*h, size_t(MAX_POINTS)) + 3) / 4;
+  memset(_processedIn.get(), 0, flagWords * sizeof(unsigned));
+  memset(_processedAux.get(), 0, flagWords * sizeof(unsigned));
 }
 
 void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
@@ -69,17 +73,21 @@ void EdgePointCollection::create_voter_lists(const std::vector<std::vector<int>>
     throw std::length_error("EdgePointCollection::create_voters_lists: inconsistent sizes");
   
   _votersIndex[0+CUDA_OFFSET] = 0;
+  size_t voterCount = 0;
   for (size_t i = 0; i < point_count(); ++i)
-    _votersIndex[i+1+CUDA_OFFSET] = (int)(_votersIndex[i+CUDA_OFFSET] + voter_lists[i].size());
-  
-  if (_votersIndex[point_count()+CUDA_OFFSET] > MAX_VOTERLIST_SIZE)
-    throw std::length_error("EdgePointCollection::create_voters_lists: too many voters");
-  
-  int *p = &_votersList[0];
+  {
+    if (voter_lists[i].size() > MAX_VOTERLIST_SIZE - voterCount)
+      throw std::length_error("EdgePointCollection::create_voters_lists: too many voters");
+    voterCount += voter_lists[i].size();
+    _votersIndex[i+1+CUDA_OFFSET] = static_cast<int>(voterCount);
+  }
+
+  _votersList.reset(new int[voterCount]);
+  int *p = _votersList.get();
   for (const auto& vlist: voter_lists)
     p = std::copy(vlist.begin(), vlist.end(), p);
 
-  if (p != &_votersList[0] + _votersIndex[point_count()+CUDA_OFFSET])
+  if (p != _votersList.get() + voterCount)
     throw std::logic_error("EdgePointCollection::create_voters_lists: invalid count copied");
 }
 

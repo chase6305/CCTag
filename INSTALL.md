@@ -8,23 +8,60 @@ Required tools:
 
 * CMake >= 3.14 to build the code
 * Git
-* C/C++ compiler with C++14 support
+* C/C++ compiler with C++17 and `std::filesystem` support
   * see here: <https://en.cppreference.com/w/cpp/compiler_support>
-  * TLDR gcc >= 5, clang >= 3.4, msvc >= 2017
+  * GCC >= 9, Clang with a C++17 filesystem library, or Visual Studio >= 2019
 
 Optional tool:
 
-* CUDA >= 9.0
+* CUDA >= 11.0
 Note: On Windows, there are compatibility issues to build the GPU part due to conflicts between msvc/nvcc/thrust/eigen/boost.
 
 ### Dependencies
 
 Most of the dependencies can be installed from the common repositories (apt, yum etc):
 
-* Eigen3 (libeigen3-dev) >= 3.3.4  (NOTE: in order to have Cuda support on Windows, at least version 3.3.9 is required)
-* Boost >= 1.66 ([accumulators, core, date-time, exception, filesystem, math, program-options, ptr-container, system, serialization, stacktrace, timer, thread]-dev)
+* Eigen3 (libeigen3-dev) >= 3.3.9
+* Boost >= 1.66 ([exception, program-options, ptr-container, serialization, spirit, stacktrace]-dev)
 * OpenCV >= 3.1
 * TBB >= 2021.5.0
+* [doctest](https://github.com/doctest/doctest) >= 2.4.11 (unit tests only)
+
+Boost.ProgramOptions is needed only for applications, and doctest only for
+unit tests. When configuring CCTag directly with the vcpkg toolchain,
+`CCTAG_BUILD_APPS` and `CCTAG_BUILD_TESTS` select the corresponding manifest
+features before dependency installation. Set both options to `OFF` to install
+only the library dependencies. Explicit `VCPKG_MANIFEST_FEATURES` and
+`VCPKG_MANIFEST_NO_DEFAULT_FEATURES` settings are respected.
+
+A standalone `vcpkg install` still includes both features by default. Use
+`vcpkg install --x-no-default-features` for library dependencies only, adding
+`--x-feature=apps` or `--x-feature=tests` when needed. When CCTag is embedded
+with `add_subdirectory`, the parent project controls vcpkg feature selection.
+External manifests also retain their own feature selection.
+
+If your package manager provides an older doctest, install a compatible release
+from source, or set `CCTAG_BUILD_TESTS=OFF`:
+
+```bash
+git clone --depth 1 --branch v2.5.3 https://github.com/doctest/doctest.git
+cmake -S doctest -B doctest/build -DDOCTEST_WITH_TESTS=OFF \
+  -DDOCTEST_WITH_MAIN_IN_STATIC_LIB=OFF -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --install doctest/build
+```
+
+Add the install prefix to `CMAKE_PREFIX_PATH` when configuring CCTag. The installed
+CCTag package does not require doctest.
+
+The installed `CCTag::CCTag` target propagates the C++17 requirement. Rebuild
+consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,
+`CCTag::radiusRatiosInit()` and `Color` use `std::array`, and the edge-linking
+helper uses `std::unordered_set`. The detection API's owning pointer containers
+and serialized XML format are retained.
+
+CUDA builds also propagate the CUDA configuration and toolkit include paths
+through this target. `Parameters::setUseCuda(false)` selects the CPU path in a
+CUDA build; `setUseCuda(true)` selects the GPU path.
 
 ----------
 
@@ -57,10 +94,11 @@ cmake .. -DCCTag_DIR=$CCTAG_INSTALL/lib/cmake/CCTag/
 A docker image can be built using the Ubuntu based [Dockerfile](Dockerfile),which is based on nvidia/cuda image (<https://hub.docker.com/r/nvidia/cuda/>)
 
 A parameter `CUDA_TAG` can be passed when building the image to select the ubuntu and cuda version.
-For example to create a ubuntu 16.04 with cuda 8.0 for development, use
+First build the dependency image, then build CCTag with the same CUDA and Ubuntu versions:
 
 ```bash
-docker build --build-arg CUDA_TAG=8.0-devel --tag cctag .
+docker build -f Dockerfile_deps --tag alicevision/cctag-deps:cuda11.8.0-ubuntu20.04 .
+docker build --tag cctag .
 ```
 
 The complete list of available tags can be found on the nvidia [dockerhub page](https://hub.docker.com/r/nvidia/cuda/)

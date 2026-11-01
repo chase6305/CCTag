@@ -56,7 +56,9 @@ If the marker is not valid, draw the center and the ID in red.
 
 .. code-block:: c++
   :linenos:
-  :emphasize-lines: 13
+  :emphasize-lines: 15
+
+  #include <cctag/utils/Math.hpp>
 
   void drawMarkers(const boost::ptr_list<ICCTag>& markers, cv::Mat& image)
   {
@@ -84,7 +86,7 @@ If the marker is not valid, draw the center and the ID in red.
               cv::ellipse(image,
                           center,
                           cv::Size(rescaledOuterEllipse.a(), rescaledOuterEllipse.b()),
-                          rescaledOuterEllipse.angle() * 180 / boost::math::constants::pi<double>(),
+                          rescaledOuterEllipse.angle() * 180 / cctag::numerical::pi<double>(),
                           0,
                           360,
                           color,

@@ -16,7 +16,7 @@ static std::string SourceDir;
 static std::string DestinationDir;
 static std::string ParametersFile;
 static float Epsilon;
-static boost::optional<bool> UseCuda;
+static CudaMode UseCuda = CudaMode::FromParameters;
 
 static std::string ParseOptions(int argc, char **argv)
 {
@@ -28,7 +28,7 @@ static std::string ParseOptions(int argc, char **argv)
     ("gen-ref", "Generate reference results from images in the source directory")
     ("gen-test", "Generate test results based on settings from reference results in the source directory")
     ("compare", "Compare reference results in the source directory with results in the destination directory")
-    ("use-cuda", value<bool>()->notifier([](bool v) { UseCuda = v; }),
+    ("use-cuda", value<bool>()->notifier([](bool v) { UseCuda = v ? CudaMode::Enabled : CudaMode::Disabled; }),
       "Overrides implementation specified by parameters")
     ("help", "Print help");
   
@@ -118,7 +118,8 @@ int main(int argc, char **argv)
   try {
     auto mode = ParseOptions(argc, argv);
     
-    if (UseCuda) std::clog << "CUDA override SET to: " << *UseCuda << std::endl;
+    if (UseCuda != CudaMode::FromParameters)
+      std::clog << "CUDA override SET to: " << (UseCuda == CudaMode::Enabled) << std::endl;
     else std::clog << "CUDA override NOT SET; will use parameters" << std::endl;
     
     if (mode == "gen-ref") {

@@ -54,14 +54,22 @@
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// Assert needs to be everywhere
-#include <boost/static_assert.hpp>
-#include <boost/type_traits.hpp>
-#include <boost/current_function.hpp>
+// Preserve useful function signatures in diagnostics without Boost.Assert.
+#if defined(_MSC_VER)
+#define CCTAG_CURRENT_FUNCTION __FUNCSIG__
+#elif defined(__GNUC__) || defined(__clang__)
+#define CCTAG_CURRENT_FUNCTION __PRETTY_FUNCTION__
+#else
+#define CCTAG_CURRENT_FUNCTION __func__
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // compatibility problems...
 #include <cstddef>
+#include <cstdint>
+#ifndef _MSC_VER
+#include <sys/types.h>
+#endif
 namespace std {
 #ifdef _MSC_VER
 	using ssize_t = intptr_t;
@@ -111,7 +119,7 @@ namespace std {
  * @def   CCTAG_INFOS
  * @brief informations : filename, line number, function name
  **/
- #define CCTAG_INFOS  "file: " << __FILE__ << ",  line: " << __LINE__ << ::std::endl << "function: " << BOOST_CURRENT_FUNCTION
+ #define CCTAG_INFOS  "file: " << __FILE__ << ",  line: " << __LINE__ << ::std::endl << "function: " << CCTAG_CURRENT_FUNCTION
 
  #define CCTAG_VAR( a )  # a << ": " << a
  #define CCTAG_VAR2( a, b )  # a << ": " << a << ", " << # b << ": " << b

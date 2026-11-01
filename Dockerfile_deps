@@ -1,13 +1,12 @@
-ARG CUDA_TAG=10.2
-ARG OS_TAG=18.04
+ARG CUDA_TAG=11.8.0
+ARG OS_TAG=20.04
 FROM nvidia/cuda:${CUDA_TAG}-devel-ubuntu${OS_TAG}
 LABEL maintainer="AliceVision Team alicevision@googlegroups.com"
 
 # use CUDA_TAG to select the image version to use
 # see https://hub.docker.com/r/nvidia/cuda/
 #
-# For example, to create a ubuntu 16.04 with cuda 8.0 for development, use
-# docker build --build-arg CUDA_TAG=8.0 --tag alicevision/cctag-deps:cuda${CUDA_TAG}-ubuntu${OS_TAG} -f Dockerfile_deps .
+# Build Dockerfile_deps first with the same CUDA_TAG and OS_TAG.
 #
 # then execute with nvidia docker (https://github.com/nvidia/nvidia-docker/wiki/Installation-(version-2.0))
 # docker run -it --runtime=nvidia cctag_deps
@@ -56,10 +55,19 @@ WORKDIR /tmp/boost
 RUN wget https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     tar -xzf boost_${BOOST_VERSION_FILENAME}.tar.gz && \
     cd boost_${BOOST_VERSION_FILENAME} && \
-    ./bootstrap.sh --with-libraries=atomic,container,date_time,exception,filesystem,graph,log,math,program_options,regex,serialization,system,test,thread,stacktrace,timer --prefix="${DEPS_INSTALL_PATH}" && \
+    ./bootstrap.sh --with-libraries=program_options,serialization --prefix="${DEPS_INSTALL_PATH}" && \
     ./b2 link=shared install && \
     cd /opt && \
     rm -rf /tmp/boost
+
+WORKDIR /tmp/doctest
+ENV DOCTEST_VERSION="2.5.3"
+RUN wget -q https://github.com/doctest/doctest/archive/refs/tags/v${DOCTEST_VERSION}.tar.gz -O doctest.tar.gz && \
+    tar xf doctest.tar.gz --strip-components=1 && \
+    cmake -S . -B build -DDOCTEST_WITH_TESTS=OFF \
+      -DDOCTEST_WITH_MAIN_IN_STATIC_LIB=OFF -DCMAKE_INSTALL_PREFIX:PATH=${DEPS_INSTALL_PATH} && \
+    cmake --install build && \
+    cd /opt && rm -rf /tmp/doctest
 
 WORKDIR /tmp/eigen
 ENV EIGEN_VERSION="3.4.0"

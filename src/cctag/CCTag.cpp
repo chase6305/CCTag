@@ -8,6 +8,9 @@
 #include <cctag/CCTag.hpp>
 #include <cctag/utils/Defines.hpp>
 #include <cctag/DataSerialization.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/nvp.hpp>
+#include <boost/serialization/serialization.hpp>
 #include <cctag/geometry/Ellipse.hpp>
 #include <cctag/Statistic.hpp>
 #include <cctag/algebra/matrix/Operation.hpp>
@@ -17,8 +20,7 @@
 
 #include <opencv2/core/core_c.h>
 
-#include <boost/array.hpp>
-#include <boost/mpl/bool.hpp>
+#include <array>
 
 #include <cstddef>
 #include <cmath>
@@ -29,7 +31,7 @@ namespace cctag
 
 namespace optimization = cctag::numerical::optimization;
 
-const boost::array<float, 5> CCTag::_radiusRatiosInit =
+const std::array<float, 5> CCTag::_radiusRatiosInit =
 {
   (29.0f / 9.0f),
   (29.0f / 13.0f),

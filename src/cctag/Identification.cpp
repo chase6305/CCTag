@@ -21,13 +21,13 @@
 #include "cctag/cuda/tag.h"
 #endif
 
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/mean.hpp>
-#include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/variance.hpp>
-#include <boost/assert.hpp>
+#include <cctag/utils/Statistics.hpp>
+#include <array>
+#include <cassert>
+#include <stdexcept>
 
 #include <cmath>
+#include <chrono>
 #include <mutex>
 #include <vector>
 
@@ -37,6 +37,9 @@
 
 namespace cctag {
 namespace identification {
+
+template<typename Kernel>
+static std::pair<float, float> convImageCutImpl(const Kernel& kernel, ImageCut& cut);
 
 /**
  * @brief Read and identify a 1D rectified image signal.
@@ -53,10 +56,9 @@ bool orazioDistanceRobust(
         const std::vector<cctag::ImageCut> & cuts,
         float minIdentProba)
 {
-  BOOST_ASSERT( cuts.size() > 0 );
+  assert( cuts.size() > 0 );
 
   using namespace cctag::numerical;
-  using namespace boost::accumulators;
 
   using MapT = std::map<float, MarkerID>;
 
@@ -78,30 +80,27 @@ bool orazioDistanceRobust(
     const cctag::ImageCut& cut = cuts[i];
     if ( !cut.outOfBounds() )
     {
-      MapT sortedId; // 6-nearest neighbours along with their affectation probability
-      const std::size_t sizeIds = 6;
-      IdSet idSet;
-      idSet.reserve(sizeIds);
+      MapT sortedId;
 
       // imgSig contains the rectified 1D signal.
       //boost::numeric::ublas::vector<float> imgSig( cuts.front().imgSignal().size() );
       const std::vector<float> & imgSig = cut.imgSignal();
 
       // compute some statitics
-      accumulator_set< float, features< /*tag::median,*/ tag::variance > > acc;
+      RunningMeanVariance<> acc;
       // Put the image signal into the accumulator
       acc = std::for_each( imgSig.begin()+30, imgSig.end(), acc ); // todo@Lilian +30
 
       // Mean
-      const float medianSig = boost::accumulators::mean( acc );
+      const float medianSig = acc.mean();
       
       // or median
       //const float medianSig = computeMedian( imgSig );
 
-      const float varSig = boost::accumulators::variance( acc );
+      const float varSig = acc.variance();
 
-      accumulator_set< float, features< tag::mean > > accInf;
-      accumulator_set< float, features< tag::mean > > accSup;
+      RunningMean accInf;
+      RunningMean accSup;
       
       bool doAccumulate = false;
       for(float i : imgSig)
@@ -117,8 +116,8 @@ bool orazioDistanceRobust(
             accSup( i );
         }
       }
-      const float muw = boost::accumulators::mean( accSup );
-      const float mub = boost::accumulators::mean( accInf );
+      const float muw = accSup.mean();
+      const float mub = accInf.mean();
 
       // Find the nearest ID in rrBank
       const float stepX = (cut.endSig() - cut.beginSig()) / ( imgSig.size() - 1.f );
@@ -165,24 +164,17 @@ bool orazioDistanceRobust(
   #ifdef GRIFF_DEBUG
       assert( sortedId.size() > 0 );
   #endif // GRIFF_DEBUG
-      int k = 0;
-      for( auto riter = sortedId.crbegin(); riter != sortedId.crend(); ++riter )
-      {
-        if( k >= sizeIds ) break;
-        idSet.emplace_back(riter->second, riter->first);
-        ++k;
-      }
+      const auto best = sortedId.crbegin();
 
   #ifdef GRIFF_DEBUG
-      assert( idSet.size() > 0 );
-      MarkerID _debug_m = idSet.front().first;
+      MarkerID _debug_m = best->second;
       assert( _debug_m > 0 );
       assert( vScore.size() > _debug_m );
   #endif // GRIFF_DEBUG
 
       {
         std::lock_guard<std::mutex> lock(vscore_mutex);
-        vScore[idSet.front().first].push_back(idSet.front().second);
+        vScore[best->second].push_back(best->first);
       }
     }
   });
@@ -216,7 +208,6 @@ void extractSignalUsingHomography(
         const Eigen::Matrix3f & mHomography,
         const Eigen::Matrix3f & mInvHomography)
 {
-  using namespace boost;
   using namespace cctag::numerical;
   
   float xStart, xStop, yStart, yStop;
@@ -330,14 +321,13 @@ void extractSignalUsingHomographyDeprec(
         float begin,
         float end)
 {
-  using namespace boost;
   using namespace cctag::numerical;
 
-  BOOST_ASSERT( rectifiedCut.imgSignal().size() == 0 );
-  BOOST_ASSERT( end >= begin );
+  assert( rectifiedCut.imgSignal().size() == 0 );
+  assert( end >= begin );
   
   // Check wheter the image signal size has been properly allocated.
-  BOOST_ASSERT( nSamples == rectifiedCut.imgSignal().size() );
+  assert( nSamples == rectifiedCut.imgSignal().size() );
 
   nSamples = rectifiedCut.imgSignal().size();
   
@@ -514,7 +504,7 @@ float costSelectCutFun(
   float sumVar = 0;
   for( const std::size_t i : randomIdx )
   {
-    BOOST_ASSERT( i < varCuts.size() );
+    assert( i < varCuts.size() );
     
     //CCTAG_COUT_VAR(outerPoints[i].gradient());
     //CCTAG_COUT_VAR(sqrt(outerPoints[i].dX()*outerPoints[i].dX()
@@ -548,8 +538,6 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
         const float scale,
         const size_t numSamplesOuterEdgePointsRefinement)
 {
-  using namespace boost::numeric;
-  using namespace boost::accumulators;
   using namespace cctag::numerical;
 
   selectSize = std::min( selectSize, collectedCuts.size() );
@@ -558,9 +546,9 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
   varCuts.reserve(collectedCuts.size());
   for( const cctag::ImageCut & cut : collectedCuts )
   {
-    accumulator_set< float, features< tag::variance > > acc;
+    RunningMeanVariance<> acc;
     acc = std::for_each( cut.imgSignal().begin(), cut.imgSignal().end(), acc );
-    varCuts.push_back( variance( acc ) );
+    varCuts.push_back( acc.variance() );
   }
   
   const float varMax = *std::max_element(varCuts.begin(),varCuts.end());
@@ -599,7 +587,7 @@ void selectCutCheapUniform( std::vector< cctag::ImageCut > & vSelectedCuts,
 bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::size_t numSamplesOuterEdgePointsRefinement)
 {
     // Subpixellic refinement of the outer edge points ///////////////////////////
-    const float cutLengthOuterPointRefine = 3.f * sqrt(2.f) * scale; // with scale=2^i, i=0..nLevel
+    const float cutLengthOuterPointRefine = 3.f * std::sqrt(2.f) * scale; // with scale=2^i, i=0..nLevel
     const float halfWidth = cutLengthOuterPointRefine / 2.f;
 
     Eigen::Vector2f gradDirection = cut.stop().gradient()/cut.stop().gradient().norm();
@@ -622,20 +610,17 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::
       return false;
     
     
-    std::vector<float> kernelA = { -0.0000f, -0.0003f, -0.1065f, -0.7863f, .0f, 0.7863f, 0.1065f, 0.0003f, 0.0000f }; // size = 9, sigma = 0.5
-    std::vector<float> kernelB = { -0.0044f, -0.0540f, -0.2376f, -0.3450f, .0f, 0.3450f, 0.2376f, 0.0540f, 0.0044f }; // size = 9, sigma = 1
-    std::vector<float> kernelC = { -0.0366f, -0.1113f, -0.1801f, -0.1594f, .0f, 0.1594f, 0.1801f, 0.1113f, 0.0366f }; // size = 9, sigma = 1.5
-
-    std::vector<std::vector<float>> vKernels;
-    vKernels.push_back(kernelA);
-    vKernels.push_back(kernelB);
-    vKernels.push_back(kernelC);
+    static constexpr std::array<std::array<float, 9>, 3> vKernels{{
+      { -0.0000f, -0.0003f, -0.1065f, -0.7863f, .0f, 0.7863f, 0.1065f, 0.0003f, 0.0000f }, // sigma = 0.5
+      { -0.0044f, -0.0540f, -0.2376f, -0.3450f, .0f, 0.3450f, 0.2376f, 0.0540f, 0.0044f }, // sigma = 1
+      { -0.0366f, -0.1113f, -0.1801f, -0.1594f, .0f, 0.1594f, 0.1801f, 0.1113f, 0.0366f } // sigma = 1.5
+    }};
     
     std::map<float,float> res;
     
     for(size_t i=0; i<3 ; ++i)
     {
-      res.insert(convImageCut(vKernels[i], cutOnOuterPoint));
+      res.insert(convImageCutImpl(vKernels[i], cutOnOuterPoint));
     }
     // Get the location of the highest peak (last element)
     float maxLocation = res.rbegin()->second;
@@ -651,57 +636,45 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, std::
     return true;
 }
 
-std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut)
+template<typename Kernel>
+static std::pair<float,float> convImageCutImpl(const Kernel & kernel, ImageCut & cut)
 {
-  //double guassOneD[] = { 0.0044, 0.0540, 0.2420, 0.3991, 0.2420, 0.0540, 0.0044 };
-  
-  std::vector<float> output;
-  std::size_t sizeCut = cut.imgSignal().size();
-  std::size_t sizeKernel = kernel.size();
-  output.resize(sizeCut);
-  
-  std::size_t halfSize = (sizeKernel-1)/2;
-  
-  //std::cout << "before = [" << std::endl;
-  //for ( std::size_t i=0 ; i<sizeCut; ++i)
-  //{
-  //  std::cout << cut.imgSignal()[i] << " , " ;
-  //}
-  //std::cout << "]; " << std::endl;
-  
-  for ( std::ssize_t i=0 ; i<sizeCut; ++i)
+  const auto& signal = cut.imgSignal();
+  if(signal.empty())
+    throw std::invalid_argument("convImageCut requires a non-empty signal");
+
+  const std::size_t sizeCut = signal.size();
+  const std::size_t sizeKernel = kernel.size();
+  const std::size_t halfSize = (sizeKernel - 1) / 2;
+  float maxValue = 0.f;
+  float maxLocation = 0.f;
+
+  for(std::ssize_t i = 0; i < sizeCut; ++i)
   {
     float tmp = 0;
-    for ( std::size_t j=0 ; j<sizeKernel; ++j)
+    for(std::size_t j = 0; j < sizeKernel; ++j)
     {
       const std::ssize_t res = i - halfSize + j;
-      if (res < 0 )
-        tmp += cut.imgSignal()[0]*kernel[j];
-      else if(res >=  sizeCut)
-        tmp += cut.imgSignal()[sizeCut-1]*kernel[j];
+      if(res < 0)
+        tmp += signal[0] * kernel[j];
+      else if(res >= sizeCut)
+        tmp += signal[sizeCut - 1] * kernel[j];
       else
-        tmp += cut.imgSignal()[i-halfSize+j]*kernel[j];
+        tmp += signal[i - halfSize + j] * kernel[j];
     }
-    output[i] = tmp;
+    // Match max_element: retain the first maximum, even for a first-sample NaN.
+    if(i == 0 || maxValue < tmp)
+    {
+      maxValue = tmp;
+      maxLocation = static_cast<float>(i);
+    }
   }
-  
-  //std::cout << "convolved = [" << std::endl;
-  //for ( std::size_t i=0 ; i<sizeCut; ++i)
-  //{
-  //  std::cout << output[i] << " , " ;
-  //}
-  //std::cout << "]; " << std::endl;
-  
-  //cut.imgSignal() = output;
-  
-  // Locate the maximum value.
-  auto maxValueIt = std::max_element(output.begin(), output.end());
-  float itsLocation = (float) std::distance(output.begin(), maxValueIt);
-  
-  //CCTAG_COUT_VAR2(*maxValueIt, itsLocation);
+  return {maxValue, maxLocation};
+}
 
-  // max value, its location
-  return {*maxValueIt, itsLocation};
+std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut)
+{
+  return convImageCutImpl(kernel, cut);
 }
 
 /**
@@ -778,9 +751,9 @@ void computeHomographyFromEllipseAndImagedCenter(
 
     Eigen::Matrix3f mDiag;
     mDiag.setIdentity();
-    mDiag(0,0) = sqrt((Q22*Q33/Q11*(Q11*xc*xc + Q22*yc*yc + Q33)));
+    mDiag(0,0) = std::sqrt((Q22*Q33/Q11*(Q11*xc*xc + Q22*yc*yc + Q33)));
     mDiag(1,1) = Q33;
-    mDiag(2,2) = sqrt(-Q22*(Q11*xc*xc + Q33));
+    mDiag(2,2) = std::sqrt(-Q22*(Q11*xc*xc + Q33));
 
     for(int i=0; i < 3 ; ++i)
     {
@@ -845,7 +818,9 @@ bool refineConicFamilyGlob(
     } else { // not CUDA
 #endif // CCTAG_WITH_CUDA
 
-        boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
+#if defined(DEBUG) && !defined(CCTAG_NO_COUT)
+        const auto optimizationStart = std::chrono::steady_clock::now();
+#endif
 
         // A. Perform the optimization ///////////////////////////////////////////////
 
@@ -881,9 +856,10 @@ bool refineConicFamilyGlob(
   }
   
   // Measure the time spent in the optimization
-  boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-  boost::posix_time::time_duration d = tend - tstart;
-  const float spendTime = d.total_milliseconds();
+#if defined(DEBUG) && !defined(CCTAG_NO_COUT)
+  const auto spendTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - optimizationStart).count();
+#endif
   DO_TALK( CCTAG_COUT_DEBUG( "Optimization result: " << optimalPoint << ", duration: " << spendTime ); )
 
 #ifdef CCTAG_WITH_CUDA
@@ -893,10 +869,7 @@ bool refineConicFamilyGlob(
   
     // B. Get the signal associated to the optimal homography/imaged center //////
     {
-        boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
         getSignals(vCuts,mHomography,src);
-        boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-        boost::posix_time::time_duration d = tend - tstart;
     }
     
     // Residual normalization
@@ -953,7 +926,7 @@ bool refineConicFamilyGlob(
     
     // Final normalized residual
     
-    residual = sqrt(residual)/magnitude;
+    residual = std::sqrt(residual)/magnitude;
     if ( residual > 2.7f )
       return false;
     else
@@ -1035,9 +1008,9 @@ bool imageCenterOptimizationGlob(
         {       
         
                 // Update the residual and the optimized parameters
-                hasASolution = true;
                 if ( res < minRes )
                 {
+                    hasASolution = true;
                     minRes = res;
                     optimalPoint = point;
                     optimalHomography = mTempHomography;
@@ -1046,6 +1019,9 @@ bool imageCenterOptimizationGlob(
                 CCTAG_COUT_VAR_OPTIM(readable);
         }
     } // for(point : nearbyPoints)
+
+    if(!hasASolution)
+        return false;
 
     center = optimalPoint;
     mHomography = optimalHomography;
@@ -1181,7 +1157,7 @@ int identify_step_1(
   // Cheap (CPU only)
   
 #ifdef CCTAG_OPTIM
-  boost::posix_time::ptime t0(boost::posix_time::microsec_clock::local_time());
+  auto t0 = std::chrono::steady_clock::now();
 #endif
   
   // Sort outer points and then take a subsample
@@ -1189,12 +1165,12 @@ int identify_step_1(
   getSortedOuterPoints(ellipse, outerEllipsePoints, outerPoints, params._nSamplesOuterEllipse);
   
 #ifdef CCTAG_OPTIM
-  boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
-  boost::posix_time::time_duration d = t1 - t0;
+  auto t1 = std::chrono::steady_clock::now();
+  auto d = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
   float spendTime;
   DO_TALK(
 
-    spendTime = d.total_milliseconds();
+    spendTime = d.count();
     CCTAG_COUT_OPTIM("Time in subsampling: " << spendTime << " ms");
   )
 #endif
@@ -1232,27 +1208,21 @@ int identify_step_1(
   // The "signal of interest" is located between startSig and 1.f (endSig in ImageCut)
 
 #ifdef CCTAG_OPTIM
-  t0 = boost::posix_time::microsec_clock::local_time();
+  t0 = std::chrono::steady_clock::now();
 #endif
   
   // B. Collect all cuts associated to all outer points ////////////////////////
   std::vector<cctag::ImageCut> cuts;
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-    
     collectCuts( cuts, src, ellipse.center(), outerPoints, params._sampleCutLength, startSig);
-    
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
   
 #ifdef CCTAG_OPTIM
-  t1 = boost::posix_time::microsec_clock::local_time();
-  d = t1 - t0;
+  t1 = std::chrono::steady_clock::now();
+  d = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0);
   DO_TALK(
 
-    spendTime = d.total_milliseconds();
+    spendTime = d.count();
     CCTAG_COUT_OPTIM("Time in collectCuts: " << spendTime << " ms");
   )
 #endif
@@ -1265,8 +1235,6 @@ int identify_step_1(
   
   // C. Select a sub sample of image cuts //////////////////////////////////////
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-
     selectCutCheapUniform(
             vSelectedCuts,
             params._numCutsInIdentStep,
@@ -1278,9 +1246,6 @@ int identify_step_1(
     
     DO_TALK( CCTAG_COUT_OPTIM("Initial cut selection"); )
     
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
 
   if ( vSelectedCuts.empty() )
@@ -1375,8 +1340,6 @@ int identify_step_2(
 
   bool identSuccessful = false;
   {
-    boost::posix_time::ptime tstart( boost::posix_time::microsec_clock::local_time() );
-
     std::vector<std::list<float> > vScore;
     vScore.resize(radiusRatios.size());
 
@@ -1459,9 +1422,6 @@ int identify_step_2(
     }
 #endif // GRIFF_DEBUG
 
-    boost::posix_time::ptime tend( boost::posix_time::microsec_clock::local_time() );
-    boost::posix_time::time_duration d = tend - tstart;
-    const float spendTime = d.total_milliseconds();
   }
 
   // Tell if the identification is reliable or not.

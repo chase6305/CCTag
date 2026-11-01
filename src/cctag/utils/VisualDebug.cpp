@@ -8,14 +8,15 @@
 #include <cctag/utils/VisualDebug.hpp>
 #include <cctag/utils/FileDebug.hpp>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
+#include <cctag/utils/Math.hpp>
 #include <opencv2/opencv.hpp>
 
 #ifdef CCTAG_SERIALIZE
 #include <opencv2/imgproc/imgproc_c.h>
 #endif
 
-namespace bfs = boost::filesystem;
+namespace bfs = std::filesystem;
 
 namespace cctag
 {
@@ -24,7 +25,7 @@ CCTagVisualDebug::CCTagVisualDebug() = default;
 
 CCTagVisualDebug::~CCTagVisualDebug() = default;
 
-void CCTagVisualDebug::initializeFolders(const boost::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns)
+void CCTagVisualDebug::initializeFolders(const std::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns)
 {
 #ifdef CCTAG_SERIALIZE
   // Create inputImagePath/result if it does not exist
@@ -243,7 +244,7 @@ void CCTagVisualDebug::drawMarker(const cctag::CCTag& marker, bool drawScaledMar
   
   cv::ellipse(_backImage , cv::Point(center.x(),center.y()),
       cv::Size(rescaledOuterEllipse.a(), rescaledOuterEllipse.b()),
-      rescaledOuterEllipse.angle()*180/boost::math::constants::pi<double>(), 0, 360, color);
+      rescaledOuterEllipse.angle()*180/cctag::numerical::pi<double>(), 0, 360, color);
 #endif
 }
 
@@ -253,7 +254,7 @@ void CCTagVisualDebug::drawInfos(const cctag::CCTag& marker, bool drawScaledMark
     CvFont font1;
   cvInitFont(&font1, CV_FONT_HERSHEY_SIMPLEX, 0.8, 0.8, 0, 2);
 
-  std::string sId = boost::lexical_cast<std::string>(marker.id() + 1);
+  std::string sId = std::to_string(marker.id() + 1);
 
   int x, y;
   if (drawScaledMarker) {

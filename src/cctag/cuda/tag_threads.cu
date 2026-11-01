@@ -17,18 +17,21 @@ namespace cctag
 using namespace std;
 
 TagThread::TagThread( TagThreads* creator, TagPipe* pipe, int layer )
-    : std::thread( &TagThread::call, this )
+    : std::thread( )
     , _creator( creator )
     , _pipe( pipe )
     , _my_layer( layer )
-{ }
+{
+    std::thread::operator=( std::thread( &TagThread::call, this ) );
+}
 
 void TagThread::call( void )
 {
     _creator->startWait( );
 
+    std::size_t generation = 0;
     while( true ) {
-        _creator->frameReadyWait( );
+        generation = _creator->frameReadyWait( generation );
 
         _pipe->handleframe( _my_layer );
 
@@ -38,7 +41,6 @@ void TagThread::call( void )
 
 TagThreads::TagThreads( )
     : _start( 0 )
-    , _frameReady( 0 )
     , _frameDone( 0 )
 { }
 
@@ -62,8 +64,8 @@ void TagThreads::oneRound( )
 
 void TagThreads::startWait( )      { _start.wait( 1 );  }
 void TagThreads::startPost( )      { _start.post( _layers ); }
-void TagThreads::frameReadyWait( ) { _frameReady.wait( 1 );  }
-void TagThreads::frameReadyPost( ) { _frameReady.post( _layers ); }
+std::size_t TagThreads::frameReadyWait( std::size_t previous ) { return _frameReady.wait( previous ); }
+void TagThreads::frameReadyPost( ) { _frameReady.post( ); }
 void TagThreads::frameDoneWait( )  { _frameDone.wait( _layers );  }
 void TagThreads::frameDonePost( )  { _frameDone.post( 1 ); }
 

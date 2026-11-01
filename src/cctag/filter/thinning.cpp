@@ -14,6 +14,8 @@ static const int lutthin2[512] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
 void thin( cv::Mat & inout, cv::Mat & temp )
 {
+  // imageIter writes only interior pixels; its second pass reads temp's border.
+  inout.copyTo(temp);
   imageIter( inout, temp, lutthin1 );
   imageIter( temp, inout, lutthin2 );
 }

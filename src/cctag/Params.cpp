@@ -8,7 +8,7 @@
 #include "Params.hpp"
 
 #include <boost/archive/xml_iarchive.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 
 #include <cstdlib>
 #include <fstream>
@@ -88,7 +88,7 @@ Parameters::~Parameters( )
 
 void Parameters::setDebugDir(const std::string& debugDir)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = std::filesystem;
     fs::path directory(debugDir);
     if(fs::exists(directory))
     {

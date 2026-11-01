@@ -7,33 +7,26 @@
  */
 #pragma once
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics.hpp>
-
+#include <chrono>
 #include <cstddef>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
 namespace cctag {
 namespace logtime {
 
-namespace btime = boost::posix_time;
-namespace bacc  = boost::accumulators;
-
 struct Mgmt
 {
+    using Clock = std::chrono::steady_clock;
+
     class Measurement
     {
     public:
-        Measurement( )
-            : _probe( nullptr )
-        { }
-
-        void log( const char* probename, const btime::time_duration& duration ) {
-            if( ! _probe ) _probe = strdup( probename );
-            _ms_acc( duration.total_milliseconds() );
-            _us_acc( duration.total_microseconds() );
+        void log( const char* probename, std::chrono::microseconds duration ) {
+            if( _count == 0 ) _probe = probename;
+            _totalMilliseconds += std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+            ++_count;
         }
 
         bool doPrint( ) const;
@@ -41,12 +34,12 @@ struct Mgmt
         void print( std::ostream& ostr ) const;
 
     private:
-        const char* _probe;
-        bacc::accumulator_set<long, bacc::features<bacc::tag::mean> > _ms_acc;
-        bacc::accumulator_set<long, bacc::features<bacc::tag::mean> > _us_acc;
+        std::string _probe;
+        std::chrono::milliseconds::rep _totalMilliseconds = 0;
+        std::size_t _count = 0;
     };
 
-    btime::ptime             _previous_time;
+    Clock::time_point        _previous_time;
     std::vector<Measurement> _durations;
     int                      _reserved;
     int                      _idx;
@@ -59,8 +52,8 @@ struct Mgmt
         // std::cerr << "logging >>>" << probename << "<<<" << std::endl;
         if( _idx >= _reserved ) return;
 
-        btime::ptime now( btime::microsec_clock::local_time() );
-        btime::time_duration duration = now - _previous_time;
+        const auto now = Clock::now();
+        const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - _previous_time);
         _previous_time = now;
         _durations[_idx].log( probename, duration );
         _idx++;

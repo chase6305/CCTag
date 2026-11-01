@@ -10,11 +10,11 @@
 
 #include <cctag/geometry/Point.hpp>
 
-#include <boost/array.hpp>
+#include <array>
 
 namespace cctag {
 
-struct Color : public boost::array<float, 4>
+struct Color : public std::array<float, 4>
 {
 	Color()
 	{
