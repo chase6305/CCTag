@@ -59,6 +59,10 @@ consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,
 helper uses `std::unordered_set`. The detection API's owning pointer containers
 and serialized XML format are retained.
 
+CUDA builds also propagate the CUDA configuration and toolkit include paths
+through this target. `Parameters::setUseCuda(false)` selects the CPU path in a
+CUDA build; `setUseCuda(true)` selects the GPU path.
+
 ----------
 
 ### Using CCTag as third party

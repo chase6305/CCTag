@@ -167,11 +167,13 @@ if(CCTAG_WITH_CUDA)
   # https://github.com/Kitware/CMake/blob/master/Modules/FindCUDA.cmake#L147
   # INCLUDE_DIRECTORIES -- "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
   include_directories(${CMAKE_CURRENT_LIST_DIR}
+          ${generated_dir}
           ${OpenCV_INCLUDE_DIRS}
           ${Eigen_INCLUDE_DIR}
           "${CMAKE_SOURCE_DIR}/src")
 
   CUDA_ADD_LIBRARY(CCTag ${CUDA_cpp} ${CUDA_cu} ${CCTag_cpp})
+  target_compile_definitions(CCTag PUBLIC CCTAG_WITH_CUDA)
 
   # since we used CUDA_ADD_LIBRARY we cannot use PUBLIC or PRIVATE here
   target_link_libraries(CCTag

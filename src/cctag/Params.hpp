@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <cctag/cctag_config.hpp>
+
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/nvp.hpp>
 

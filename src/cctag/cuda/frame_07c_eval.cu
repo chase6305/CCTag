@@ -130,6 +130,8 @@ void count_winners( FrameMetaPtr&                   meta,
  * unique indices of chosen inner points.
  */
 __global__
+// Match both launch sites so register allocation permits the full block.
+__launch_bounds__(32 * 32)
 void eval_chosen( FrameMetaPtr             meta,
                   DevEdgeList<TriplePoint> voters,       // input-output
                   const float*             chosen_flow_length, // input
@@ -219,6 +221,9 @@ bool Frame::applyVoteEval( )
     _voters.copySizeFromDevice( _stream, EdgeListCont );
 #endif
     _interm_inner_points.copySizeFromDevice( _stream, EdgeListWait );
+    if( _interm_inner_points.host.size == 0 ) {
+        return false;
+    }
 
 // #ifndef NDEBUG
 #if 0

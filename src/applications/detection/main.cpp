@@ -287,7 +287,10 @@ int main(int argc, char** argv)
         params.setDebugDir(cmdline._debugDir);
     }
 
-    cctag::device_prop_t deviceInfo(false);
+    if(params._useCuda)
+    {
+        cctag::device_prop_t deviceInfo(false);
+    }
 #endif // CCTAG_WITH_CUDA
 
     bfs::path myPath(bfs::absolute(cmdline._filename));

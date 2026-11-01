@@ -46,6 +46,10 @@ Applications use Boost.ProgramOptions. Unit tests use doctest; see
 ``INSTALL.md`` for installing it from source when the system package is older.
 Set :code:`CCTAG_BUILD_TESTS=OFF` to build without the test framework.
 
+Link :code:`CCTag::CCTag` to inherit the C++17 requirement and the CUDA
+configuration and header paths for CUDA builds. Use
+:code:`Parameters::setUseCuda(false)` to select the CPU path in a CUDA build.
+
 ------------
 
 CCTag can be installed from the following package managers.
