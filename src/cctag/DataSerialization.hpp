@@ -12,9 +12,7 @@
 #include <cctag/CCTag.hpp>
 #include <cctag/geometry/Ellipse.hpp>
 
-#include <boost/serialization/nvp.hpp>
-#include <boost/serialization/serialization.hpp>
-#include <boost/archive/text_oarchive.hpp>
+namespace boost { namespace archive { class text_oarchive; } }
 
 namespace cctag {
 

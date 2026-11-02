@@ -76,6 +76,8 @@ set( CCTag_HEADERS
         ./cctag/utils/Exceptions.hpp
         ./cctag/utils/FileDebug.hpp
         ./cctag/utils/LogTime.hpp
+        ./cctag/utils/Statistics.hpp
+        ./cctag/utils/Math.hpp
         ./cctag/utils/Release.hpp
         ./cctag/utils/Singleton.hpp
         ./cctag/utils/Talk.hpp
@@ -165,19 +167,18 @@ if(CCTAG_WITH_CUDA)
   # https://github.com/Kitware/CMake/blob/master/Modules/FindCUDA.cmake#L147
   # INCLUDE_DIRECTORIES -- "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
   include_directories(${CMAKE_CURRENT_LIST_DIR}
+          ${generated_dir}
           ${OpenCV_INCLUDE_DIRS}
           ${Eigen_INCLUDE_DIR}
           "${CMAKE_SOURCE_DIR}/src")
 
   CUDA_ADD_LIBRARY(CCTag ${CUDA_cpp} ${CUDA_cu} ${CCTag_cpp})
+  target_compile_definitions(CCTag PUBLIC CCTAG_WITH_CUDA)
 
   # since we used CUDA_ADD_LIBRARY we cannot use PUBLIC or PRIVATE here
   target_link_libraries(CCTag
                        ${OpenCV_LIBS}
-                       Boost::date_time 
                        Boost::serialization 
-                       Boost::filesystem 
-                       Boost::timer
                        Eigen3::Eigen
                        TBB::tbb
                        ${CUDA_CUDADEVRT_LIBRARY})
@@ -222,10 +223,7 @@ else() # without CUDA
                         PUBLIC
                           ${OpenCV_LIBS}
                           Eigen3::Eigen
-                          Boost::date_time
-                          Boost::filesystem
                           Boost::serialization 
-                          Boost::timer
                         PRIVATE
                           TBB::tbb)
 
@@ -234,6 +232,8 @@ else() # without CUDA
   endif()
 
 endif()
+
+target_compile_features(CCTag PUBLIC cxx_std_17)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   target_compile_definitions(CCTag PUBLIC "-DNOMINMAX")
@@ -251,15 +251,7 @@ endif(CCTAG_NO_COUT)
 if(CCTAG_VISUAL_DEBUG)
   target_compile_definitions(CCTag PRIVATE "-DCCTAG_VISUAL_DEBUG")
 endif(CCTAG_VISUAL_DEBUG)
-if(CCTAG_EIGEN_MEMORY_ALIGNMENT)
-  # If user enabled Eigen alignment assumptions, then allocations should be with appropriate
-  # alignment. Fortunately this is fixed in C++17. While we can't upgrade to C++17 just yet, some
-  # compilers support overaligned allocation feature with a separate flag.
-  # See https://eigen.tuxfamily.org/dox/group__TopicUnalignedArrayAssert.html
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7.1)
-    target_compile_options(CCTag PRIVATE "-faligned-new")
-  endif()
-else()
+if(NOT CCTAG_EIGEN_MEMORY_ALIGNMENT)
   target_compile_definitions(CCTag PUBLIC ${AV_EIGEN_DEFINITIONS})
 endif()
 set_target_properties(CCTag PROPERTIES VERSION ${PROJECT_VERSION})

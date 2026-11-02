@@ -9,6 +9,7 @@
 
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
+#include <thrust/system/cuda/execution_policy.h>
 #ifdef CCTAG_NO_THRUST_COPY_IF
 #include <thrust/host_vector.h>
 #endif
@@ -80,7 +81,8 @@ bool Frame::applyVoteIf( )
     sz = output_host_end - output_host.begin();
     output_end = output_begin + sz;
 #else
-    output_end = thrust::copy_if( input_begin, input_end, output_begin, select_op );
+    // The winner data is produced by eval_chosen on this stream.
+    output_end = thrust::copy_if( thrust::cuda::par.on(_stream), input_begin, input_end, output_begin, select_op );
 
     sz = output_end - output_begin;
 #endif

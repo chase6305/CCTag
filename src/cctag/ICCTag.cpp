@@ -10,7 +10,7 @@
 #include <cctag/Detection.hpp>
 #include <cctag/utils/LogTime.hpp>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/archive/xml_iarchive.hpp>
 
 #include <fstream>
@@ -47,7 +47,7 @@ void cctagDetection(
     
   if ( !parameterFilename.empty() )
   {
-    if (!boost::filesystem::exists( parameterFilename )) {
+    if (!std::filesystem::exists( parameterFilename )) {
       std::cerr << std::endl
         << "The input parameter file \""<< parameterFilename << "\" is missing" << std::endl;
       return;

@@ -20,15 +20,7 @@
 #include <cctag/utils/Defines.hpp>
 #include <cctag/utils/VisualDebug.hpp>
 
-#include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/round.hpp>
-#include <boost/math/special_functions/log1p.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/multi_array/multi_array_ref.hpp>
-#include <boost/multi_array/subarray.hpp>
-#include <boost/container/flat_set.hpp>
-
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <cctag/utils/Math.hpp>
 
 #include <deque>
 #include <array>
@@ -96,7 +88,7 @@ void vote(EdgePointCollection& edgeCollection,
 		throw std::domain_error("thrVotingAngle must be equal to 0 or edge points gradients have to be normalized.");
     }
 
-    
+    std::vector<float> vDist;
     for (int iEdgePoint = 0; iEdgePoint < pointCount; ++iEdgePoint )
     {
         EdgePoint& p = *edgeCollection(iEdgePoint);
@@ -108,7 +100,7 @@ void vote(EdgePointCollection& edgeCollection,
         EdgePoint* choosen = nullptr;
 
         // To save all sub-segments length
-        std::vector<float> vDist; ///
+        vDist.clear();
         vDist.reserve(params._nCrowns * 2 - 1);
 
         // Length of the reconstructed field line approximation between the two
@@ -254,7 +246,7 @@ void vote(EdgePointCollection& edgeCollection,
     void edgeLinking(EdgePointCollection& edgeCollection, std::list<EdgePoint*>& convexEdgeSegment, EdgePoint* pmax,
             std::size_t windowSizeOnInnerEllipticSegment, float averageVoteMin) {
         
-        boost::container::flat_set<unsigned int> processed; // (x,y) packed in 32 bits
+        std::unordered_set<unsigned int> processed; // (x,y) packed in 32 bits
         if (pmax) {
             // Add current max point
             convexEdgeSegment.push_back(pmax);
@@ -269,7 +261,7 @@ void vote(EdgePointCollection& edgeCollection,
     }
     
     void edgeLinkingDir(EdgePointCollection& edgeCollection,
-                        boost::container::flat_set<unsigned int>& processed,
+                        std::unordered_set<unsigned int>& processed,
                         const EdgePoint* p,
                         int dir,
                         std::list<EdgePoint*>& convexEdgeSegment,
@@ -290,7 +282,7 @@ void vote(EdgePointCollection& edgeCollection,
         while ((i < maxLength) && (found) && (averageVote >= averageVoteMin) )
         {
 
-            float angle = std::fmod(float(std::atan2(p->dY(), p->dX())) + 2.0f * boost::math::constants::pi<float>(), 2.0f * boost::math::constants::pi<float>());
+            float angle = std::fmod(float(std::atan2(p->dY(), p->dX())) + 2.0f * cctag::numerical::pi<float>(), 2.0f * cctag::numerical::pi<float>());
             phi.push_back(angle);
             //sumPhi += angle;
 
@@ -300,7 +292,7 @@ void vote(EdgePointCollection& edgeCollection,
 
             }
 
-            int shifting = (int) boost::math::round(((angle + boost::math::constants::pi<float>() / 4.0f) / (2.0f * boost::math::constants::pi<float>())) * 8.0f) - 1;
+            int shifting = (int) cctag::numerical::round(((angle + cctag::numerical::pi<float>() / 4.0f) / (2.0f * cctag::numerical::pi<float>())) * 8.0f) - 1;
 
             static int xoff[] = {1, 1, 0, -1, -1, -1, 0, 1};
             int yoff[] = {0, dir * -1, dir * -1, dir * -1, 0, dir * 1, dir * 1, dir * 1};
@@ -431,10 +423,13 @@ void vote(EdgePointCollection& edgeCollection,
             const float f = 1.f;
 
             std::vector<Eigen::Vector3f> pts;
-            pts.reserve(children.size());
+            // The floating-point stride can select one extra sample at the end.
+            const auto sampleCapacity = std::min(children.size(), nSubsampleSize + 1);
+            pts.reserve(sampleCapacity);
 
             std::vector<float> weights;
-            weights.reserve(children.size());
+            if (weightedType != NO_WEIGHT)
+                weights.reserve(sampleCapacity);
 
             // Store a subset of EdgePoint* on which the robust ellipse estimation will
             // performed. Considering a subset of points is valid as what matters is the 
@@ -469,6 +464,7 @@ void vote(EdgePointCollection& edgeCollection,
 
             std::size_t counter = 0;
             std::array<int, 5> perm;
+            std::vector<float> dist;
             while (counter < 70)
             {
                 // Random subset of 5 points from pts
@@ -514,7 +510,7 @@ void vote(EdgePointCollection& edgeCollection,
                             }
 
                             // Compute the median from the set of points pts
-                            std::vector<float> dist;
+                            dist.clear();
                             numerical::distancePointEllipse(dist, pts, q);
 
                             if (weightedType != NO_WEIGHT) // todo
@@ -616,7 +612,9 @@ void vote(EdgePointCollection& edgeCollection,
 
         std::array<int, 5> permutations;
         std::vector<cctag::Point2d<Eigen::Vector3f> > points;
-        points.reserve(5);
+        points.reserve(8);
+        std::vector<float> dist;
+        std::vector<float> anotherDist;
         while (cnt < 100)
         {
             points.clear(); // Capacity is kept, but the elements are all erased
@@ -656,13 +654,12 @@ void vote(EdgePointCollection& edgeCollection,
                     continue;
                 }
 
-                std::vector<float> dist;
+                dist.clear();
                 numerical::distancePointEllipse(dist, pts, q);
 
                 const float S1 = numerical::medianRef(dist);
 
-                std::vector<float> anotherDist;
-
+                anotherDist.clear();
                 numerical::distancePointEllipse(anotherDist, anotherPts, q);
 
                 const float S2 = numerical::medianRef(anotherDist);

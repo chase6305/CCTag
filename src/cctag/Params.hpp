@@ -7,14 +7,13 @@
  */
 #pragma once
 
-#include <boost/math/constants/constants.hpp>
+#include <cctag/cctag_config.hpp>
+
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/nvp.hpp>
-#include <sys/stat.h>  // needed for stat and mkdir
-#include <sys/types.h> // needed for stat and mkdir
 
-#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #define NO_WEIGHT 0

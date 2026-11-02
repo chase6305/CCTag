@@ -8,9 +8,8 @@
 #include <cctag/geometry/Ellipse.hpp>
 #include <cctag/geometry/Point.hpp>
 // #include <cctag/algebra/Invert.hpp>
-#include <cctag/utils/Exceptions.hpp>
 #include <cctag/utils/Defines.hpp>
-#include <boost/math/special_functions/sign.hpp>
+#include <cctag/utils/Math.hpp>
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <Eigen/Geometry>
@@ -141,8 +140,8 @@ void Ellipse::computeParameters()
 		const float Ru = -wCentre / Auu;
 		const float Rv = -wCentre / Avv;
 
-		const float aAux = std::sqrt( std::abs( Ru ) ) * boost::math::sign( Ru );
-		const float bAux = std::sqrt( std::abs( Rv ) ) * boost::math::sign( Rv );
+		const float aAux = std::sqrt( std::abs( Ru ) ) * cctag::numerical::sign( Ru );
+		const float bAux = std::sqrt( std::abs( Rv ) ) * cctag::numerical::sign( Rv );
 
 		if( aAux < 0.f || bAux < 0.f )
 		{

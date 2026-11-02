@@ -7,6 +7,8 @@
  */
 #pragma once
 
+#include <map>
+
 #include <cctag/cuda/cctag_cuda_runtime.h>
 
 #include "frame.h"

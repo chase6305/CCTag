@@ -16,9 +16,7 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <boost/accumulators/statistics/median.hpp>
-#include <boost/math/special_functions/pow.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <cctag/utils/Math.hpp>
 
 #include <cmath>
 #include <vector>
@@ -160,6 +158,8 @@ void cutInterpolated(
         cctag::ImageCut & cut,
         const cv::Mat & src);
 
+/// Return the first convolution maximum and its sample index.
+/// Throws std::invalid_argument when the image signal is empty.
 std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut);
 
 void blurImageCut(float sigma, cctag::ImageCut & cut);
@@ -372,11 +372,11 @@ inline float dis( const float sig, const float val, const float mub, const float
 {
   if ( val == -1 )
   {
-          return boost::math::pow<2>( std::max( sig - mub, 0.f ) ) / ( 2.0f * varSubS );
+          return cctag::numerical::square( std::max( sig - mub, 0.f ) ) / ( 2.0f * varSubS );
   }
   else
   {
-          return boost::math::pow<2>( std::min( sig - muw, 0.f ) ) / ( 2.0f * varSubS );
+          return cctag::numerical::square( std::min( sig - muw, 0.f ) ) / ( 2.0f * varSubS );
   }
 }
 

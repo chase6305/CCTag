@@ -5,12 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/round.hpp>
-#include <boost/iterator/indirect_iterator.hpp>
+#include <cctag/utils/Math.hpp>
 #include <cctag/EdgePoint.hpp>
 #include <cctag/Fitting.hpp>
 #include <cctag/utils/Defines.hpp>
@@ -29,6 +24,8 @@
 #include <cstdlib>
 #include <vector>
 #include <utility>
+#include <limits>
+#include <tuple>
 #include <Eigen/Eigenvalues>
 
 namespace cctag {
@@ -40,13 +37,19 @@ namespace geometry
 using Vector6f = Eigen::Matrix<float, 6, 1>;
 using Conic = std::tuple<Vector6f, Eigen::Vector2f>; // 6 coefficients + center offset
 
+template<typename T>
+static const T& pointValue(const T& point) { return point; }
+
+template<typename T>
+static const T& pointValue(T* point) { return *point; }
+
 template<typename It>
 static Eigen::Vector2f get_offset(It begin, It end)
 {
   Eigen::Vector2f center(0, 0);
   const size_t n = end - begin;
   for (; begin != end; ++begin)
-    center += Eigen::Vector2f((*begin)(0), (*begin)(1));
+    center += Eigen::Vector2f(pointValue(*begin)(0), pointValue(*begin)(1));
   return center / n;
 }
 
@@ -57,12 +60,12 @@ get_scatter_matrix(It begin, It end, const Eigen::Vector2f& offset)
   using namespace Eigen;
   
   const auto qf = [&](It it) {
-    Vector2f p((*it)(0), (*it)(1));
+    Vector2f p(pointValue(*it)(0), pointValue(*it)(1));
     auto pc = p - offset;
     return Vector3f(pc(0)*pc(0), pc(0)*pc(1), pc(1)*pc(1));
   };
   const auto lf = [&](It it) {
-    Vector2f p((*it)(0), (*it)(1));
+    Vector2f p(pointValue(*it)(0), pointValue(*it)(1));
     auto pc = p - offset;
     return Vector3f(pc(0), pc(1), 1);
   };
@@ -193,7 +196,7 @@ void to_ellipse(const Conic& conic, Ellipse& ellipse)
 
   Vector2f center = c + std::get<1>(conic);
   Vector2f radius = Vector2f(std::sqrt(1.f/vals(0)), std::sqrt(1.f/vals(1)));
-  float angle = boost::math::constants::pi<float>() - std::atan2(mat_u(0,1), mat_u(1,1));
+  float angle = cctag::numerical::pi<float>() - std::atan2(mat_u(0,1), mat_u(1,1));
   
   if (radius(0) <= 0 || radius(1) <= 0)
   {
@@ -327,8 +330,7 @@ void ellipseFitting( cctag::numerical::geometry::Ellipse& e, const std::vector<c
         throw std::domain_error(
                 "fitEllipse: " + std::to_string(numPts) + " provided, at least 5 are needed to estimate an ellipse");
     }
-    using indirect_iterator = boost::indirect_iterator<std::vector<cctag::EdgePoint*>::const_iterator>;
-    geometry::fitEllipse(indirect_iterator(points.begin()), indirect_iterator(points.end()), e);
+    geometry::fitEllipse(points.begin(), points.end(), e);
 }
 
 void circleFitting(cctag::numerical::geometry::Ellipse& e, const std::vector<cctag::EdgePoint*>& points) {
@@ -349,7 +351,7 @@ void circleFitting(cctag::numerical::geometry::Ellipse& e, const std::vector<cct
 
   float xC = -0.5f * V(0, 3) / V(3, 3);
   float yC = -0.5f * V(1, 3) / V(3, 3);
-  float radius = sqrt(xC*xC + yC*yC - V(2, 3) / V(3, 3));
+  float radius = std::sqrt(xC*xC + yC*yC - V(2, 3) / V(3, 3));
 
   if (radius <= .0f) 
   {

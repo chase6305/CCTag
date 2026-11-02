@@ -299,6 +299,8 @@ public:
     void init( cudaStream_t stream )
     {
         static bool hostInited = false;
+        host.size = 0;
+        copySizeToDevice( stream, EdgeListCont );
         dev .init( alloc_num, stream );
         if (!hostInited) {
           hostInited = true;

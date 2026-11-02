@@ -19,8 +19,6 @@
 #include <boost/exception/get_error_info.hpp>
 #include <boost/exception/info.hpp>
 #include <boost/stacktrace.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/version.hpp>
 #include <boost/version.hpp>
 
 #include <exception>

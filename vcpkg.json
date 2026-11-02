@@ -8,40 +8,38 @@
   "documentation": "https://cctag.readthedocs.io/",
   "license": "MPL-2.0",
   "dependencies": [
-    "boost-accumulators",
-    "boost-algorithm",
     {
       "name": "boost-config",
       "version>=": "1.91.0"
     },
-    "boost-container",
-    "boost-date-time",
     "boost-exception",
-    "boost-filesystem",
-    "boost-foreach",
-    "boost-iterator",
-    "boost-lexical-cast",
-    {
-      "name": "boost-math",
-      "features": [
-        "legacy"
-      ]
-    },
-    "boost-mpl",
-    "boost-multi-array",
-    "boost-program-options",
     "boost-ptr-container",
     "boost-serialization",
     "boost-spirit",
     "boost-stacktrace",
-    "boost-test",
-    "boost-thread",
-    "boost-throw-exception",
-    "boost-timer",
-    "boost-type-traits",
-    "boost-unordered",
     "eigen3",
     "opencv",
     "tbb"
-  ]
+  ],
+  "default-features": [
+    "apps",
+    "tests"
+  ],
+  "features": {
+    "apps": {
+      "description": "Build the detection and regression applications",
+      "dependencies": [
+        "boost-program-options"
+      ]
+    },
+    "tests": {
+      "description": "Build the unit tests",
+      "dependencies": [
+        {
+          "name": "doctest",
+          "version>=": "2.5.3"
+        }
+      ]
+    }
+  }
 }

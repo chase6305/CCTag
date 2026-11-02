@@ -28,14 +28,6 @@
 #include "cctag/cuda/tag.h"
 #endif
 
-#include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/round.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/unordered/unordered_set.hpp>
-#include <boost/timer/timer.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-
 #include <cmath>
 #include <exception>
 #include <fstream>
@@ -289,8 +281,6 @@ static void flowComponentAssembling(
         , std::vector<Candidate> & componentCandidates)
 #endif
 {
-  boost::posix_time::ptime tstart(boost::posix_time::microsec_clock::local_time());
-  
   DO_TALK( CCTAG_COUT_DEBUG("================= Look for another segment =================="); )
 
   int score = -1;
@@ -370,9 +360,6 @@ static void flowComponentAssembling(
     }
   }
 
-  boost::posix_time::ptime tstop(boost::posix_time::microsec_clock::local_time());
-  boost::posix_time::time_duration d = tstop - tstart;
-  const float spendTime = d.total_milliseconds();
 }
 
 static void cctagDetectionFromEdgesLoopTwoIteration(
@@ -581,10 +568,6 @@ void cctagDetectionFromEdges(
   // Call for debug only. Write the vote result as an image.
   createImageForVoteResultDebug(src, pyramidLevel);
 
-  // Set some timers
-  boost::timer::cpu_timer t3;
-  boost::posix_time::ptime tstart0(boost::posix_time::microsec_clock::local_time());
-
   std::size_t nSegmentOut = 0;
 
 #ifdef CCTAG_SERIALIZE
@@ -662,10 +645,6 @@ void cctagDetectionFromEdges(
     }
   )
 
-  boost::posix_time::ptime tstop1(boost::posix_time::microsec_clock::local_time());
-  boost::posix_time::time_duration d1 = tstop1 - tstart0;
-  const float spendTime1 = d1.total_milliseconds();
-
 #if defined CCTAG_SERIALIZE && defined DEBUG
   std::stringstream outFlowComponentsAssembling;
   outFlowComponentsAssembling << "flowComponentsAssemblingLevel" << pyramidLevel << ".txt";
@@ -686,9 +665,6 @@ void cctagDetectionFromEdges(
   });
 #endif
   
-  boost::posix_time::ptime tstop2(boost::posix_time::microsec_clock::local_time());
-  boost::posix_time::time_duration d2 = tstop2 - tstop1;
-  const float spendTime2 = d2.total_milliseconds();
 }
 
 
@@ -983,7 +959,7 @@ void cctagDetection(
       update(markersFinal, marker);
     }
 
-    markers = markersFinal;
+    markers.swap(markersFinal);
   
     markers.sort();
 

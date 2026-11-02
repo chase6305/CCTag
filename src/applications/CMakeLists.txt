@@ -1,4 +1,4 @@
-if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   # I am top-level project, i.e. I am not being include by another project
   cmake_minimum_required(VERSION 3.13)
   project(CCTagApplications LANGUAGES CXX VERSION 1.0.0)
@@ -6,7 +6,7 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
   # if this is used as a stand-alone project we need to tell whether to use PIC
@@ -39,18 +39,7 @@ else()
 endif()
 
 # BOOST
-if(NOT TARGET Boost::boost)
-  set(BOOST_REQUIRED_COMPONENTS "date_time;serialization;filesystem;program_options;timer")
-  if(WIN32)
-    set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_windbg")
-  else()
-    set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_basic")
-  endif()
-
-  find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_COMPONENTS} QUIET)
-else()
-  message(STATUS "BOOST already there")
-endif()
+find_package(Boost 1.66.0 REQUIRED COMPONENTS program_options QUIET)
 
 # OPENCV
 find_package(OpenCV REQUIRED core videoio imgproc imgcodecs highgui)
@@ -85,7 +74,7 @@ target_link_libraries(detection PUBLIC
   CCTag::CCTag
   TBB::tbb
   ${OpenCV_LIBS}
-  Boost::filesystem Boost::program_options Boost::timer
+  Boost::program_options
   )
 
 if(IL_FOUND OR DevIL_FOUND)

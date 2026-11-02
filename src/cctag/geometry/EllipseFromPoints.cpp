@@ -8,9 +8,7 @@
 #include <cctag/utils/Defines.hpp>
 #include <cctag/geometry/EllipseFromPoints.hpp>
 
-#include <boost/math/special_functions/round.hpp>
-#include <boost/math/special_functions/pow.hpp>
-#include <boost/math/constants/constants.hpp>
+#include <cctag/utils/Math.hpp>
 
 namespace cctag {
 namespace numerical {
@@ -19,10 +17,10 @@ namespace geometry {
 Point2d<Eigen::Vector3f> extractEllipsePointAtAngle( const Ellipse & ellipse, float theta )
 {
     Point2d<Eigen::Vector3f> p;
-    float x = ellipse.a() * cos( theta );
-    float y = ellipse.b() * sin( theta );
-    p.x() = ( x * cos( ellipse.angle() ) - y * sin( ellipse.angle() ) + ellipse.center().x() );
-    p.y() = ( x * sin( ellipse.angle() ) + y * cos( ellipse.angle() ) + ellipse.center().y() );
+    float x = ellipse.a() * std::cos( theta );
+    float y = ellipse.b() * std::sin( theta );
+    p.x() = ( x * std::cos( ellipse.angle() ) - y * std::sin( ellipse.angle() ) + ellipse.center().x() );
+    p.y() = ( x * std::sin( ellipse.angle() ) + y * std::cos( ellipse.angle() ) + ellipse.center().y() );
     return p;
 }
 
@@ -34,29 +32,29 @@ Point2d<Eigen::Vector3f> pointOnEllipse( const Ellipse & ellipse, const Point2d<
   float x = p.x() - ellipse.center().x();
   float y = p.y() - ellipse.center().y();
 
-  tmp.x() =    x * cos( ellipse.angle() ) + y * sin( ellipse.angle() );
-  tmp.y() =  - x * sin( ellipse.angle() ) + y * cos( ellipse.angle() );
+  tmp.x() =    x * std::cos( ellipse.angle() ) + y * std::sin( ellipse.angle() );
+  tmp.y() =  - x * std::sin( ellipse.angle() ) + y * std::cos( ellipse.angle() );
   
-  float cs = sqrt( tmp.x()*tmp.x()/(ellipse.a()*ellipse.a()) + tmp.y()*tmp.y()/(ellipse.b()*ellipse.b()) );
+  float cs = std::sqrt( tmp.x()*tmp.x()/(ellipse.a()*ellipse.a()) + tmp.y()*tmp.y()/(ellipse.b()*ellipse.b()) );
   tmp.x() /= cs;
   tmp.y() /= cs;
   
   // Transform back into the original coordinate system
-  res.x() = ( tmp.x() * cos( ellipse.angle() ) - tmp.y() * sin( ellipse.angle() ) + ellipse.center().x() );
-  res.y() = ( tmp.x() * sin( ellipse.angle() ) + tmp.y() * cos( ellipse.angle() ) + ellipse.center().y() );
+  res.x() = ( tmp.x() * std::cos( ellipse.angle() ) - tmp.y() * std::sin( ellipse.angle() ) + ellipse.center().x() );
+  res.y() = ( tmp.x() * std::sin( ellipse.angle() ) + tmp.y() * std::cos( ellipse.angle() ) + ellipse.center().y() );
 
   return res;
 }
 
 void points( const Ellipse & ellipse, std::size_t nb, std::vector< cctag::Point2d<Eigen::Vector3f> > & pts )
 {
-	const float step = 2.0f * boost::math::constants::pi<float>() / nb;
-	points( ellipse, nb, step, 2 * boost::math::constants::pi<float>(), pts );
+	const float step = 2.0f * cctag::numerical::pi<float>() / nb;
+	points( ellipse, nb, step, 2 * cctag::numerical::pi<float>(), pts );
 }
 
 void points( const Ellipse & ellipse, std::size_t nb, const float phi1, const float phi2, std::vector< cctag::Point2d<Eigen::Vector3f> > & pts )
 {
-	const float step = 2.0f * boost::math::constants::pi<float>() / nb;
+	const float step = 2.0f * cctag::numerical::pi<float>() / nb;
 	pts.reserve( std::size_t( ( phi2 - phi1 ) / step ) + 1 );
 	for( float theta = phi1; theta <= phi2; theta += step )
 	{
@@ -66,11 +64,11 @@ void points( const Ellipse & ellipse, std::size_t nb, const float phi1, const fl
 
 void ellipsePoint( const cctag::numerical::geometry::Ellipse& ellipse, float theta, Eigen::Vector3f& pt )
 {
-	const float x = ellipse.a() * cos( theta );
-	const float y = ellipse.b() * sin( theta );
+	const float x = ellipse.a() * std::cos( theta );
+	const float y = ellipse.b() * std::sin( theta );
 
-	pt( 0 ) = x * cos( ellipse.angle() ) - y* sin( ellipse.angle() ) + ellipse.center().x();
-	pt( 1 ) = x * sin( ellipse.angle() ) + y* cos( ellipse.angle() ) + ellipse.center().y();
+	pt( 0 ) = x * std::cos( ellipse.angle() ) - y* std::sin( ellipse.angle() ) + ellipse.center().x();
+	pt( 1 ) = x * std::sin( ellipse.angle() ) + y* std::cos( ellipse.angle() ) + ellipse.center().y();
 	pt( 2 ) = 1;
 }
 
@@ -80,13 +78,13 @@ void computeIntermediatePoints(const Ellipse & ellipse, Point2d<Eigen::Vector3i>
 	float b = -ellipse.a() * std::cos( ellipse.angle() ) + ellipse.a() * std::sin( ellipse.angle() );
 
 	const float t11 = std::atan2( -a, b );
-	const float t12 = t11 + boost::math::constants::pi<float>();
+	const float t12 = t11 + cctag::numerical::pi<float>();
 
 	a = -ellipse.b()* std::sin( ellipse.angle() ) + ellipse.b() * std::cos( ellipse.angle() );
 	b = -ellipse.a()* std::cos( ellipse.angle() ) - ellipse.a() * std::sin( ellipse.angle() );
 
 	const float t21 = std::atan2( -a, b );
-	const float t22 = t21 + boost::math::constants::pi<float>();
+	const float t22 = t21 + cctag::numerical::pi<float>();
 
 	Eigen::Vector3f v11;
 	ellipsePoint( ellipse, t11, v11 );
@@ -97,14 +95,14 @@ void computeIntermediatePoints(const Ellipse & ellipse, Point2d<Eigen::Vector3i>
 	Eigen::Vector3f v22;
 	ellipsePoint( ellipse, t22, v22 );
 
-	pt11.x() = (boost::math::round( v11( 0 ) ) );
-	pt11.y() = (boost::math::round( v11( 1 ) ) );
-	pt12.x() = (boost::math::round( v12( 0 ) ) );
-	pt12.y() = (boost::math::round( v12( 1 ) ) );
-	pt21.x() = (boost::math::round( v21( 0 ) ) );
-	pt21.y() = (boost::math::round( v21( 1 ) ) );
-	pt22.x() = (boost::math::round( v22( 0 ) ) );
-	pt22.y() = (boost::math::round( v22( 1 ) ) );
+	pt11.x() = (cctag::numerical::round( v11( 0 ) ) );
+	pt11.y() = (cctag::numerical::round( v11( 1 ) ) );
+	pt12.x() = (cctag::numerical::round( v12( 0 ) ) );
+	pt12.y() = (cctag::numerical::round( v12( 1 ) ) );
+	pt21.x() = (cctag::numerical::round( v21( 0 ) ) );
+	pt21.y() = (cctag::numerical::round( v21( 1 ) ) );
+	pt22.x() = (cctag::numerical::round( v22( 0 ) ) );
+	pt22.y() = (cctag::numerical::round( v22( 1 ) ) );
 }
 
 void rasterizeEllipticalArc(const Ellipse & ellipse, const Point2d<Eigen::Vector3i> & pt1, const Point2d<Eigen::Vector3i> & pt2, std::vector< Point2d<Eigen::Vector3i> > & vPoint, std::size_t intersectionIndex)
@@ -123,9 +121,9 @@ void rasterizeEllipticalArc(const Ellipse & ellipse, const Point2d<Eigen::Vector
 			std::vector<float> intersections = intersectEllipseWithLine( ellipse, x, false );
 
 			if( intersections.size() == 2 ){
-				vPoint.emplace_back(x,boost::math::round(intersections[intersectionIndex]));
+				vPoint.emplace_back(x,cctag::numerical::round(intersections[intersectionIndex]));
 			}else if( intersections.size() == 1 ){
-				vPoint.emplace_back(x,boost::math::round(intersections[0]));
+				vPoint.emplace_back(x,cctag::numerical::round(intersections[0]));
 			}
 		}
 
@@ -138,9 +136,9 @@ void rasterizeEllipticalArc(const Ellipse & ellipse, const Point2d<Eigen::Vector
 			std::vector<float> intersections = intersectEllipseWithLine( ellipse, y, true );
 
 			if( intersections.size() == 2 ){
-				vPoint.emplace_back(boost::math::round(intersections[intersectionIndex]), y);
+				vPoint.emplace_back(cctag::numerical::round(intersections[intersectionIndex]), y);
 			}else if( intersections.size() == 1 ){
-				vPoint.emplace_back(boost::math::round(intersections[0]), y);
+				vPoint.emplace_back(cctag::numerical::round(intersections[0]), y);
 			}
 		}
 	}
@@ -156,7 +154,6 @@ void rasterizeEllipticalArc(const Ellipse & ellipse, const Point2d<Eigen::Vector
 
 std::vector<float> intersectEllipseWithLine( const numerical::geometry::Ellipse& ellipse, float y, bool horizontal)
 {
-	using boost::math::pow;
 	std::vector<float> res;
 
 	float a, b, c;
@@ -167,14 +164,14 @@ std::vector<float> intersectEllipseWithLine( const numerical::geometry::Ellipse&
 	if (horizontal){
 		a = eC(0,0);
 		b = 2 * ( y * eC(0,1) + eC(0,2) );
-		c = eC(1,1) * pow<2>(y) + 2 * y * eC(2,1) + eC(2,2);
+		c = eC(1,1) * cctag::numerical::square(y) + 2 * y * eC(2,1) + eC(2,2);
 	}else{
 		a = eC(1,1);
 		b = 2 * ( y * eC(0,1) + eC(1,2) );
-		c = eC(0,0) * pow<2>(y) + 2 * y * eC(0,2) + eC(2,2);
+		c = eC(0,0) * cctag::numerical::square(y) + 2 * y * eC(0,2) + eC(2,2);
 	}
 
-	const float discriminant = pow<2>(b) / 4.0f - a * c;
+	const float discriminant = cctag::numerical::square(b) / 4.0f - a * c;
 
 	if( discriminant > 0.f )
 	{

@@ -133,6 +133,7 @@ void Frame::upload( const unsigned char* image )
                               getHeight(),
                               cudaMemcpyHostToDevice,
                               _stream );
+    cudaEventRecord( _download_ready_event.plane, _stream );
 }
 
 void Frame::uploadComplete( )

@@ -6,47 +6,63 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #include <cctag/CCTagMarkersBank.hpp>
-#include <cctag/utils/Exceptions.hpp>
 #include <cctag/utils/Defines.hpp>
 
-#include <boost/numeric/conversion/bounds.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+#include <boost/spirit/include/qi.hpp>
 
 #include <cmath>
 #include <fstream>
 #include <vector>
 #include <ios>
+#include <iterator>
+#include <limits>
+#include <utility>
 
 namespace cctag
 {
 
+namespace
+{
+
+bool cctagLineParse(std::string::const_iterator first,
+                    std::string::const_iterator last,
+                    std::vector<float>& rr)
+{
+  float n;
+  using boost::phoenix::push_back;
+  using namespace boost::spirit::qi;
+  using boost::spirit::qi::_1;
+  const bool parsed = phrase_parse(first, last,
+    *((uint_[boost::phoenix::ref(n) = _1] >> '/' >>
+       uint_[boost::phoenix::ref(n) = boost::phoenix::ref(n) / _1] |
+       double_[boost::phoenix::ref(n) = _1])
+      [push_back(boost::phoenix::ref(rr), boost::phoenix::ref(n))]),
+    space);
+  return parsed && first == last;
+}
+
+} // namespace
+
 CCTagMarkersBank::CCTagMarkersBank( std::size_t nCrowns )
 {
-  _markers.clear();
   if ( nCrowns == 3 )
   {
+    _markers.reserve(32);
     for(const auto & idThreeCrown : CCTagMarkersBank::idThreeCrowns)
     {
-      std::vector<float> line;
-      line.reserve(5);
-      for(float j : idThreeCrown)
-      {
-        line.push_back(j);
-      }
-      _markers.push_back(line);
+      _markers.emplace_back(std::begin(idThreeCrown), std::end(idThreeCrown));
     }
     
   }
   else if ( nCrowns == 4 )
   {
+    _markers.reserve(128);
     for(const auto & idFourCrown : CCTagMarkersBank::idFourCrowns)
     {
-      std::vector<float> line;
-      line.reserve(7);
-      for(float j : idFourCrown)
-      {
-        line.push_back(j);
-      }
-      _markers.push_back(line);
+      _markers.emplace_back(std::begin(idFourCrown), std::end(idFourCrown));
     }
   }
 }
@@ -71,7 +87,7 @@ void CCTagMarkersBank::read( const std::string & file )
     cctagLineParse( str.begin(), str.end(), rr);
     if ( rr.size() )
     {
-      _markers.push_back( rr );
+      _markers.push_back( std::move(rr) );
     }
   }
   input.close();
@@ -82,7 +98,7 @@ std::size_t CCTagMarkersBank::identify( const std::vector<float> & marker ) cons
   std::vector< std::vector<float> >::const_iterator itm = _markers.begin();
 
   std::size_t imin = 0;
-  float normMin = boost::numeric::bounds<float>::highest();
+  float normMin = std::numeric_limits<float>::max();
   std::size_t i = 0;
 
   while( itm != _markers.end() )

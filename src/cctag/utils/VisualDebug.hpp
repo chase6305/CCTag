@@ -14,7 +14,8 @@
 #include <cctag/Colors.hpp>
 #include <cctag/CCTag.hpp>
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
+#include <map>
 
 namespace cctag
 {
@@ -44,7 +45,7 @@ public:
 
     void initBackgroundImage(const cv::Mat & back);
     
-    void initializeFolders(const boost::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns = 4);
+    void initializeFolders(const std::filesystem::path & rootPath, const std::string & outputFolder, std::size_t nCrowns = 4);
 
     void newSession(const std::string & sessionName);
 

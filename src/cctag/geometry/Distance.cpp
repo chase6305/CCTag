@@ -38,7 +38,7 @@ float distancePointEllipseScalar(const Eigen::Vector3f& p, const Eigen::Matrix3f
   qL( 0 ) = Q( 0, 0 ) ; qL( 1 ) = Q( 0, 1 ) ; qL( 2 ) = Q( 0, 2 ) ;
   qL( 3 ) = Q( 1, 1 ) ; qL( 4 ) = Q( 1, 2 ) ;
   qL( 5 ) = Q( 2, 2 );
-  return boost::math::pow<2>( aux.dot(qL) ) / denom;
+  return cctag::numerical::square( aux.dot(qL) ) / denom;
 }
 
 #ifdef __AVX2__

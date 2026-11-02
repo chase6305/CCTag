@@ -1,9 +1,28 @@
 # Version 3,4 is the first that supports separable compilation on Linux.
 # Windows requires more work, and Mac is probably still hopeless.
-# Version 3.13 is needed for boost-stacktrace
 cmake_minimum_required(VERSION 3.13)
 
 include(ExternalProject)
+
+# Select vcpkg dependencies before its toolchain runs inside project().
+# Both build options default to ON below; honor explicit choices here.
+get_filename_component(_cctag_source_dir "${CMAKE_CURRENT_SOURCE_DIR}" REALPATH)
+set(_cctag_manifest_dir "${_cctag_source_dir}")
+if(DEFINED VCPKG_MANIFEST_DIR)
+  get_filename_component(_cctag_manifest_dir "${VCPKG_MANIFEST_DIR}" REALPATH)
+endif()
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
+   AND _cctag_manifest_dir STREQUAL _cctag_source_dir)
+  if(NOT DEFINED VCPKG_MANIFEST_NO_DEFAULT_FEATURES)
+    set(VCPKG_MANIFEST_NO_DEFAULT_FEATURES ON)
+  endif()
+  if(NOT DEFINED CCTAG_BUILD_APPS OR CCTAG_BUILD_APPS)
+    list(APPEND VCPKG_MANIFEST_FEATURES apps)
+  endif()
+  if(NOT DEFINED CCTAG_BUILD_TESTS OR CCTAG_BUILD_TESTS)
+    list(APPEND VCPKG_MANIFEST_FEATURES tests)
+  endif()
+endif()
 
 project(CCTag VERSION 1.0.4 LANGUAGES C CXX)
 
@@ -66,7 +85,7 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
   list(APPEND CUDA_NVCC_FLAGS   -Xcompiler ${CCTAG_MVSC_LINKER})
 endif()
 
-set(CCTAG_CXX_STANDARD 14)
+set(CCTAG_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD ${CCTAG_CXX_STANDARD})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD ${CCTAG_CXX_STANDARD})
@@ -113,20 +132,16 @@ endif(APPLE)
 # FIND BOOST
 # list only components that are not header-only, those have a target associated
 # the header-only components must be added with target_include_directories( ... ${Boost_INCLUDE_DIRS} )
-set(BOOST_REQUIRED_COMPONENTS "date_time;filesystem;program_options;serialization;timer")
-if(WIN32)
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_windbg")
-else()
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};stacktrace_basic")
-endif()
-
+set(BOOST_REQUIRED_COMPONENTS "serialization")
+# Keep application and test dependencies out of the installed package requirements.
+set(BOOST_BUILD_COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
 if(CCTAG_BUILD_TESTS)
-  set(BOOST_REQUIRED_COMPONENTS "${BOOST_REQUIRED_COMPONENTS};unit_test_framework")
+  find_package(doctest 2.4.11 CONFIG REQUIRED)
   enable_testing()
-  include(BoostTestHelper)
+  include(CCTagTestHelper)
 endif()
 
-find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_COMPONENTS})
+find_package(Boost 1.66.0 REQUIRED COMPONENTS ${BOOST_BUILD_COMPONENTS})
 message(STATUS "Found Boost: version ${Boost_VERSION}")
 
 if(BUILD_SHARED_LIBS)
@@ -137,7 +152,7 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 if(CCTAG_WITH_CUDA)
-  set(CCTAG_MIN_CUDA_VERSION 9.0)
+  set(CCTAG_MIN_CUDA_VERSION 11.0)
   message( STATUS "Try finding CUDA" )
   if(BUILD_SHARED_LIBS)
     message(STATUS "BUILD_SHARED_LIBS ON")

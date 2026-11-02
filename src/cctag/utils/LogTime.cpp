@@ -7,25 +7,26 @@
  */
 #include "LogTime.hpp"
 
+#include <ostream>
+
 namespace cctag {
 namespace logtime {
 
 bool Mgmt::Measurement::doPrint( ) const
 {
-    return ( _probe != nullptr );
+    return ( _count != 0 );
 }
 
 void Mgmt::Measurement::print( std::ostream& ostr ) const
 {
-    if( ! _probe ) return;
+    if( ! doPrint() ) return;
     ostr << _probe << ": "
-         << bacc::mean(_ms_acc) << "ms "
-         // << bacc::mean(_us_acc) << "us"
+         << static_cast<double>(_totalMilliseconds) / _count << "ms "
          << std::endl;
 }
 
 Mgmt::Mgmt( int rsvp )
-    : _previous_time( btime::microsec_clock::local_time() )
+    : _previous_time( Clock::now() )
     , _durations( rsvp )
     , _reserved( rsvp )
     , _idx( 0 )
@@ -33,7 +34,7 @@ Mgmt::Mgmt( int rsvp )
 
 void Mgmt::resetStartTime( )
 {
-    _previous_time = btime::microsec_clock::local_time();
+    _previous_time = Clock::now();
     _idx = 0;
 }
 

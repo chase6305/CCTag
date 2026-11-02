@@ -16,6 +16,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <cstddef>
 
 // #include "cctag/cuda/onoff.h"
 // #include "cctag/Params.hpp"
@@ -61,12 +62,35 @@ public:
     void call( void );
 };
 
+class TagFrameGate
+{
+    std::size_t _generation{0};
+    std::mutex _mutex;
+    std::condition_variable _ready;
+public:
+    std::size_t wait(std::size_t previous)
+    {
+        std::unique_lock<std::mutex> lock(_mutex);
+        _ready.wait(lock, [&] { return _generation != previous; });
+        return _generation;
+    }
+
+    void post()
+    {
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            ++_generation;
+        }
+        _ready.notify_all();
+    }
+};
+
 class TagThreads
 {
     TagPipe*         _pipe;
     int              _layers;
     TagSemaphore     _start;
-    TagSemaphore     _frameReady;
+    TagFrameGate     _frameReady;
     TagSemaphore     _frameDone;
 public:
     TagThreads( );
@@ -77,7 +101,7 @@ public:
 
     void startWait( );
     void startPost( );
-    void frameReadyWait( );
+    std::size_t frameReadyWait( std::size_t previous );
     void frameReadyPost( );
     void frameDoneWait( );
     void frameDonePost( );

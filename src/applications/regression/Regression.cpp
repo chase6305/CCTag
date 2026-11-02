@@ -8,13 +8,13 @@
 #include <algorithm>
 #include "Regression.h"
 
-static void RemoveAllFiles(const boost::filesystem::path& dirPath);
-static std::vector<boost::filesystem::path> CollectFiles(const boost::filesystem::path& dirPath);
+static void RemoveAllFiles(const std::filesystem::path& dirPath);
+static std::vector<std::filesystem::path> CollectFiles(const std::filesystem::path& dirPath);
 static bool SortTags(FrameLog& log);
 
 /////////////////////////////////////////////////////////////////////////////
 
-TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir, boost::optional<bool> useCuda) :
+TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir, CudaMode useCuda) :
   _inputDirPath(inputDir), _outputDirPath(outputDir), _useCuda(useCuda)
 {
   if (!exists(_inputDirPath) || !is_directory(_inputDirPath))
@@ -27,8 +27,8 @@ TestRunner::TestRunner(const std::string& inputDir, const std::string& outputDir
 
 void TestRunner::adjustParameters(cctag::Parameters& parameters)
 {
-  if (_useCuda.has_value())
-    parameters._useCuda = *_useCuda;
+  if (_useCuda != CudaMode::FromParameters)
+    parameters._useCuda = _useCuda == CudaMode::Enabled;
 }
 
 // Input directory must contain images.
@@ -75,12 +75,12 @@ TestChecker::TestChecker(const std::string& referenceDir, const std::string& tes
   _testFilePaths = CollectFiles(_testDirPath);
 }
 
-boost::filesystem::path TestChecker::testToReferencePath(const boost::filesystem::path& testPath)
+std::filesystem::path TestChecker::testToReferencePath(const std::filesystem::path& testPath)
 {
   const auto testFilename = testPath.filename();
   auto it = std::find_if(_referenceFilePaths.begin(), _referenceFilePaths.end(),
-    [testFilename](const boost::filesystem::path& p) { return p.filename() == testFilename; });
-  return it != _referenceFilePaths.end() ? *it : boost::filesystem::path();
+    [testFilename](const std::filesystem::path& p) { return p.filename() == testFilename; });
+  return it != _referenceFilePaths.end() ? *it : std::filesystem::path();
 }
 
 bool TestChecker::check()
@@ -99,7 +99,7 @@ bool TestChecker::check()
   return !_failed;
 }
 
-void TestChecker::check(const boost::filesystem::path& testFilePath)
+void TestChecker::check(const std::filesystem::path& testFilePath)
 {
   auto referenceFilePath = testToReferencePath(testFilePath);
   if (referenceFilePath.empty())
@@ -171,22 +171,22 @@ void TestChecker::compare(const DetectedTag& referenceTag, const DetectedTag& te
 
 /////////////////////////////////////////////////////////////////////////////
 
-static void RemoveAllFiles(const boost::filesystem::path& dirPath)
+static void RemoveAllFiles(const std::filesystem::path& dirPath)
 {
-  using namespace boost::filesystem;
+  using namespace std::filesystem;
   remove_all(dirPath);
   create_directories(dirPath);
 }
 
-static std::vector<boost::filesystem::path> CollectFiles(const boost::filesystem::path& dirPath)
+static std::vector<std::filesystem::path> CollectFiles(const std::filesystem::path& dirPath)
 {
-  using namespace boost::filesystem;
+  using namespace std::filesystem;
   std::vector<path> filePaths;
   
   directory_iterator it(dirPath), end;
   while (it != end) {
     auto de = *it++;
-    if (de.status().type() == regular_file)
+    if (de.is_regular_file())
       filePaths.push_back(canonical(de.path()));
   }
   

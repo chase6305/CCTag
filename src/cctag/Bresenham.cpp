@@ -9,7 +9,7 @@
 #include <cctag/Bresenham.hpp>
 #include <cctag/utils/FileDebug.hpp>
 
-#include <boost/math/special_functions/sign.hpp>
+#include <cctag/utils/Math.hpp>
 
 #include <cmath>
 
@@ -18,8 +18,8 @@ namespace cctag {
 static void updateXY(const float & dx, const float & dy, int & x, int & y,  float & e, int & stpX, int & stpY)
 {
 	float a = std::abs(dy/dx);
-	stpX = boost::math::sign<int>(dx);
-	stpY = boost::math::sign<int>(dy);
+	stpX = cctag::numerical::sign<int>(dx);
+	stpY = cctag::numerical::sign<int>(dy);
 	e += a;
 	x += stpX;
 	if (e>=0.5f)
@@ -75,7 +75,7 @@ EdgePoint* gradientDirectionDescent(
         {
             dx2 = imgDx.at<short>(p.y(),p.x());
             dy2 = imgDy.at<short>(p.y(),p.x());
-            dir = boost::math::sign<float>( dx2*dxRef+dy2*dyRef );
+            dir = cctag::numerical::sign<float>( dx2*dxRef+dy2*dyRef );
             dx = dir*dx2;
             dy = dir*dy2;
         }
@@ -145,7 +145,7 @@ EdgePoint* gradientDirectionDescent(
         {
             dx2 = imgDx.at<short>(p.y(),p.x());
             dy2 = imgDy.at<short>(p.y(),p.x());
-            dir = boost::math::sign<float>( dx2*dxRef+dy2*dyRef );
+            dir = cctag::numerical::sign<float>( dx2*dxRef+dy2*dyRef );
             dx = dir*dx2;
             dy = dir*dy2;
         }

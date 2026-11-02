@@ -11,6 +11,7 @@
 #include <cctag/geometry/Point.hpp>
 #include <Eigen/Core>
 #include <iostream>
+#include <vector>
 
 namespace cctag {
 namespace numerical {
