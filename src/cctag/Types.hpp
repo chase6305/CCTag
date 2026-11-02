@@ -99,6 +99,9 @@ public:
 
   void create_voter_lists(const std::vector<std::vector<int>>& voter_lists);
 
+  // One destination per edge point; -1 means that the point did not vote.
+  void create_voter_lists_from_targets(const std::vector<int>& vote_targets);
+
   voter_list voters(const EdgePoint* p) const
   {
     int i = (*this)(p);

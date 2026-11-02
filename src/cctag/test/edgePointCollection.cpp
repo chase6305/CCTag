@@ -135,6 +135,53 @@ TEST_CASE("empty_and_overflowing_image_sizes")
     CHECK_THROWS_AS(cctag::EdgePointCollection(std::numeric_limits<std::size_t>::max(), 2), std::length_error);
 }
 
+TEST_CASE("flat_voter_lists_match_grouped_lists_and_keep_point_order")
+{
+    cv::RNG random(0xc57a6);
+    for(int count : {0, 1, 2, 7, 31, 32, 33, 255, 256, 257, 4096})
+    {
+        cctag::EdgePointCollection points(count, 1);
+        for(int i = 0; i < count; ++i)
+            points.add_point(i, 0, 1.f, 1.f);
+
+        for(int trial = 0; trial < 8; ++trial)
+        {
+            std::vector<int> targets(count, -1);
+            std::vector<std::vector<int>> grouped(count);
+            for(int i = 0; i < count; ++i)
+            {
+                // Exercise empty lists, one crowded list and sparse destinations.
+                targets[i] = trial == 0 ? -1 : trial == 1 ? count - 1 : random.uniform(-1, count);
+                if(targets[i] >= 0)
+                    grouped[targets[i]].push_back(i);
+            }
+            points.create_voter_lists_from_targets(targets);
+            CHECK_EQ(points.get_point_count(), count);
+            for(int i = 0; i < count; ++i)
+            {
+                const auto list = points.voters(points(i));
+                REQUIRE_EQ(points.voters_size(points(i)), grouped[i].size());
+                CHECK_UNARY(std::equal(list.first, list.second, grouped[i].begin()));
+            }
+        }
+    }
+}
+
+TEST_CASE("flat_voter_lists_reject_invalid_destinations_and_sizes")
+{
+    cctag::EdgePointCollection points(2, 1);
+    points.add_point(0, 0, 1.f, 1.f);
+    points.add_point(1, 0, 1.f, 1.f);
+    CHECK_THROWS_AS(points.create_voter_lists_from_targets({0}), std::length_error);
+    CHECK_THROWS_AS(points.create_voter_lists_from_targets({-2, 0}), std::out_of_range);
+    CHECK_THROWS_AS(points.create_voter_lists_from_targets({0, 2}), std::out_of_range);
+    CHECK_NOTHROW(points.create_voter_lists_from_targets({1, 1}));
+    const auto list = points.voters(points(1));
+    REQUIRE_EQ(points.voters_size(points(1)), 2);
+    CHECK_EQ(list.first[0], 0);
+    CHECK_EQ(list.first[1], 1);
+}
+
 TEST_CASE("voting_keeps_valid_field_lines_after_rejected_ones")
 {
     for(unsigned crowns : {3u, 4u})

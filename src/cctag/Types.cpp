@@ -91,4 +91,35 @@ void EdgePointCollection::create_voter_lists(const std::vector<std::vector<int>>
     throw std::logic_error("EdgePointCollection::create_voters_lists: invalid count copied");
 }
 
+void EdgePointCollection::create_voter_lists_from_targets(const std::vector<int>& vote_targets)
+{
+  const size_t count = point_count();
+  if (vote_targets.size() != count)
+    throw std::length_error("EdgePointCollection::create_voter_lists_from_targets: inconsistent sizes");
+
+  int* offsets = _votersIndex.get() + CUDA_OFFSET;
+  std::fill(offsets, offsets + count + 1, 0);
+  for (int target : vote_targets)
+  {
+    if (target < -1 || (target >= 0 && size_t(target) >= count))
+      throw std::out_of_range("EdgePointCollection::create_voter_lists_from_targets: invalid target");
+    if (target >= 0)
+      ++offsets[target + 1];
+  }
+  for (size_t i = 1; i <= count; ++i)
+    offsets[i] += offsets[i - 1];
+
+  _votersList.reset(new int[offsets[count]]);
+  // Start offsets double as write cursors. Visiting points in their original
+  // order preserves the order of each list, including ties in later sampling.
+  for (size_t i = 0; i < count; ++i)
+    if (vote_targets[i] >= 0)
+      _votersList[offsets[vote_targets[i]]++] = static_cast<int>(i);
+
+  // The cursors now hold end offsets; restore the list boundaries in place.
+  for (size_t i = count; i > 0; --i)
+    offsets[i] = offsets[i - 1];
+  offsets[0] = 0;
+}
+
 } // namespace cctag
