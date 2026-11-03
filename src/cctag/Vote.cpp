@@ -59,8 +59,8 @@ void vote(EdgePointCollection& edgeCollection,
 #endif
   
   const int pointCount = edgeCollection.get_point_count();
-  std::vector<std::vector<int>> voters;
-  voters.resize(pointCount);
+  std::vector<int> voteTargets(pointCount, -1);
+  std::vector<int> voteCounts(pointCount, 0);
 
     for (int iEdgePoint = 0; iEdgePoint < pointCount; ++iEdgePoint ) {
         EdgePoint& p = *edgeCollection(iEdgePoint);
@@ -218,21 +218,22 @@ void vote(EdgePointCollection& edgeCollection,
         if (choosen != nullptr)
         {
             int iChoosen = edgeCollection(choosen);
-            voters[iChoosen].push_back(edgeCollection(&p));
+            voteTargets[iEdgePoint] = iChoosen;
+            const std::size_t voteCount = ++voteCounts[iChoosen];
             // update flow length average scale factor
-            choosen->_flowLength = (choosen->_flowLength * (voters[iChoosen].size() - 1) + totalDistance) / voters[iChoosen].size();
+            choosen->_flowLength = (choosen->_flowLength * (voteCount - 1) + totalDistance) / voteCount;
 
             // If choosen has a number of votes greater than one of
             // the edge points, then update max.
-            if (voters[iChoosen].size() >= params._minVotesToSelectCandidate) {
+            if (voteCount >= params._minVotesToSelectCandidate) {
                 if (choosen->_isMax == -1) {
                     seeds.push_back(choosen);
                 }
-                choosen->_isMax = voters[iChoosen].size();
+                choosen->_isMax = voteCount;
             }
         }
     }
-    edgeCollection.create_voter_lists(voters);
+    edgeCollection.create_voter_lists_from_targets(voteTargets);
     
     CCTAG_COUT_LILIAN("Elapsed time for vote: " << t.elapsed());
 }
