@@ -280,7 +280,17 @@ void cctagMultiresDetection(
   std::vector<std::unique_ptr<EdgePointCollection> > vEdgePointCollections( numProcLayers );
   for( int i = 0; i<numProcLayers; i++ )
   {
-    vEdgePointCollections[i].reset(new EdgePointCollection(imgGraySrc.cols, imgGraySrc.rows));
+    std::size_t width = imgGraySrc.cols, height = imgGraySrc.rows;
+#ifndef CCTAG_SERIALIZE
+    if(!cuda_pipe)
+    {
+      const Level* level = imagePyramid.getLevel(i);
+      // Keep one empty row/column for the voting search's adjacent-pixel check.
+      width = std::min(width, level->width() + 1);
+      height = std::min(height, level->height() + 1);
+    }
+#endif
+    vEdgePointCollections[i].reset(new EdgePointCollection(width, height));
   }
 
   assert( params._numberOfMultiresLayers - numProcLayers >= 0 );

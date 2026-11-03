@@ -3,6 +3,9 @@
 #include <cctag/Types.hpp>
 #include <cctag/Vote.hpp>
 #include <cctag/Canny.hpp>
+#include <cctag/Bresenham.hpp>
+#include <cctag/ImagePyramid.hpp>
+#include <cctag/Multiresolution.hpp>
 #include <opencv2/core.hpp>
 
 #include <algorithm>
@@ -147,6 +150,48 @@ TEST_CASE("edge_extraction_preserves_pixel_order_and_roi_strides")
             }
         }
 }
+
+TEST_CASE("empty_padding_preserves_adjacent_border_search")
+{
+    cv::Mat dx(4, 4, CV_16SC1, cv::Scalar(4));
+    cv::Mat dy(4, 4, CV_16SC1, cv::Scalar(3));
+    cctag::EdgePointCollection original(8, 8), padded(5, 5), unpadded(4, 4);
+    for(auto* points : {&original, &padded, &unpadded})
+    {
+        points->add_point(0, 0, 4.f, 3.f);
+        points->add_point(3, 3, -4.f, -3.f);
+    }
+    // At (4, 3), the search checks its adjacent pixel (3, 3).
+    CHECK_EQ(cctag::gradientDirectionDescent(original, *original(0), 1, 30, dx, dy, 2500), original(1));
+    CHECK_EQ(cctag::gradientDirectionDescent(padded, *padded(0), 1, 30, dx, dy, 2500), padded(1));
+    CHECK_EQ(cctag::gradientDirectionDescent(unpadded, *unpadded(0), 1, 30, dx, dy, 2500), nullptr);
+}
+
+#ifndef CCTAG_SERIALIZE
+TEST_CASE("pyramid_edge_storage_scales_with_each_level")
+{
+    cv::Mat input(48, 64, CV_8UC1, cv::Scalar(255));
+    cctag::Parameters params;
+    params.setUseCuda(false);
+    cctag::ImagePyramid pyramid(64, 48, 4, false);
+    pyramid.build(input, params._cannyThrLow, params._cannyThrHigh, &params);
+    cctag::CCTag::List tags;
+    arrayBytes = 0;
+    struct TrackGuard
+    {
+        TrackGuard() { trackArrayMemory = true; }
+        ~TrackGuard() { trackArrayMemory = false; }
+    };
+    {
+        TrackGuard guard;
+        cctag::cctagMultiresDetection(tags, input, pyramid, 0, nullptr, params, nullptr);
+    }
+    CHECK_UNARY(tags.empty());
+    // Four full-size edge collections request over 700 KiB. The complete
+    // pyramid, including its border padding, fits within this smaller budget.
+    CHECK_LT(arrayBytes, std::size_t(384 * 1024));
+}
+#endif
 
 TEST_CASE("small_images_avoid_maximum_camera_buffers")
 {
