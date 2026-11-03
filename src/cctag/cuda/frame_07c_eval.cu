@@ -23,7 +23,7 @@ namespace cctag {
 
 namespace vote {
 
-__device__ inline
+__device__ __forceinline__ // Respect the caller's launch-bound register budget in -G builds.
 void count_winners( FrameMetaPtr&                   meta,
                     const int                       offset,
                     const int                       maxpoints,
