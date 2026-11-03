@@ -31,6 +31,26 @@ TEST_CASE("failed_center_optimization_preserves_input_geometry")
     cctag::CCTagVisualDebug::instance().clearSessions();
 }
 
+TEST_CASE("cost_function_rejects_missing_readable_pairs")
+{
+    using Point = cctag::Point2d<Eigen::Vector3f>;
+    using Stop = cctag::DirectedPoint2d<Eigen::Vector3f>;
+    const cv::Mat image(32, 32, CV_8U, cv::Scalar(100));
+    const Eigen::Matrix3f homography = Eigen::Matrix3f::Identity();
+    std::vector<cctag::ImageCut> cuts;
+    const auto checkMissingPair = [&] {
+        bool readable = true;
+        CHECK_EQ(cctag::identification::costFunctionGlob(homography, cuts, image, readable),
+                 std::numeric_limits<float>::max());
+        CHECK_UNARY(!readable);
+    };
+    checkMissingPair();
+    cuts.emplace_back(Point(0.f, 0.f), Stop(20.f, 16.f, 1.f, 0.f), std::size_t(16));
+    checkMissingPair();
+    cuts.emplace_back(Point(0.f, 0.f), Stop(-1.f, -1.f, 1.f, 0.f), std::size_t(16));
+    checkMissingPair();
+}
+
 TEST_CASE("convolution_clamps_boundaries_and_keeps_first_peak")
 {
     cctag::ImageCut cut;

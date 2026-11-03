@@ -1088,7 +1088,7 @@ void getNearbyPoints(
  * @param[in] mHomography transformation used to rectified the 1D signal from the pixel plane to the cctag plane.
  * @param[out] vCuts vector of the image cuts holding the rectified signal according to mHomography
  * @param[in] src source gray scale image (uchar)
- * @param[out] flag: true if at least one image cut has been readable (within the image bounds), false otherwise.
+ * @param[out] flag: true if at least one pair of image cuts is readable (within image bounds), false otherwise.
  * @return residual
  */
 float costFunctionGlob(
@@ -1104,13 +1104,14 @@ float costFunctionGlob(
 
   float res = 0;
   std::size_t resSize = 0;
-  for( std::size_t i = 0; i < vCuts.size() - 1; ++i )
+  for( std::size_t i = 0; i + 1 < vCuts.size(); ++i )
   {
     for( std::size_t j = i+1; j < vCuts.size(); ++j )
     {
       if ( !vCuts[i].outOfBounds() && !vCuts[j].outOfBounds() )
       {
-        const auto& is = vCuts[i].imgSignal(), js = vCuts[j].imgSignal();
+        const auto& is = vCuts[i].imgSignal();
+        const auto& js = vCuts[j].imgSignal();
         assert(is.size() == js.size());
         for (size_t ii = 0; ii < js.size(); ++ii)
           res += std::pow(is[ii] - js[ii], 2);
