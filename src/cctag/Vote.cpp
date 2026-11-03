@@ -52,7 +52,7 @@ void vote(EdgePointCollection& edgeCollection,
         const cv::Mat & dy,
         const Parameters & params)
 {
-#ifdef CCTAG_VOTE_DEBUG
+#if defined(CCTAG_SERIALIZE) && defined(CCTAG_VOTE_DEBUG)
   std::stringstream outFilenameVote;
   outFilenameVote << "vote" << CCTagVisualDebug::instance().getPyramidLevel() << ".txt";
   CCTagFileDebug::instance().newSession(outFilenameVote.str());
@@ -71,13 +71,17 @@ void vote(EdgePointCollection& edgeCollection,
         ilink = edgeCollection(link);
         edgeCollection.set_before(&p, ilink);
         
+#if defined(CCTAG_SERIALIZE) && defined(CCTAG_VOTE_DEBUG)
         CCTagFileDebug::instance().endVote();
+#endif
         
         link = gradientDirectionDescent(edgeCollection, p, 1, params._distSearch, dx, dy, params._thrGradientMagInVote);
         ilink = edgeCollection(link);
         edgeCollection.set_after(&p, ilink);
         
+#if defined(CCTAG_SERIALIZE) && defined(CCTAG_VOTE_DEBUG)
         CCTagFileDebug::instance().endVote();
+#endif
     }
     // Vote
     seeds.reserve(pointCount / 2);

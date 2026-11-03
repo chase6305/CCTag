@@ -2,9 +2,11 @@
 #include <doctest/doctest.h>
 #include <cctag/Types.hpp>
 #include <cctag/Vote.hpp>
+#include <cctag/Canny.hpp>
 #include <opencv2/core.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
@@ -88,6 +90,62 @@ TEST_CASE("processed_flags_are_independent_across_word_boundaries")
         CHECK_UNARY(!points.test_processed_in(points(i)));
         CHECK_UNARY(!points.test_processed_aux(points(i)));
     }
+}
+
+TEST_CASE("adding_points_keeps_existing_processed_flags")
+{
+    cctag::EdgePointCollection points(97, 1);
+    for(int i = 0; i < 97; ++i)
+    {
+        points.add_point(i, 0, 1.f, 1.f);
+        CHECK_UNARY(!points.test_processed_in(points(i)));
+        CHECK_UNARY(!points.test_processed_aux(points(i)));
+        points.set_processed_in(points(i), i % 2 == 0);
+        points.set_processed_aux(points(i), i % 3 == 0);
+        for(int j = 0; j <= i; ++j)
+        {
+            CHECK_EQ(points.test_processed_in(points(j)), j % 2 == 0);
+            CHECK_EQ(points.test_processed_aux(points(j)), j % 3 == 0);
+        }
+    }
+}
+
+TEST_CASE("edge_extraction_preserves_pixel_order_and_roi_strides")
+{
+    for(int width : {0, 1, 2, 7, 8, 9, 15, 16, 17, 31, 32, 33, 64})
+        for(int height : {0, 1, 5})
+        {
+            cv::Mat edgeParent(height + 4, width + 8, CV_8UC1, cv::Scalar(0));
+            cv::Mat dxParent(height + 4, width + 8, CV_16SC1, cv::Scalar(0));
+            cv::Mat dyParent(height + 4, width + 8, CV_16SC1, cv::Scalar(0));
+            auto edges = edgeParent(cv::Rect(3, 2, width, height));
+            auto dx = dxParent(cv::Rect(3, 2, width, height));
+            auto dy = dyParent(cv::Rect(3, 2, width, height));
+            std::vector<std::array<int, 4>> expected;
+            for(int y = 0; y < height; ++y)
+                for(int x = 0; x < width; ++x)
+                {
+                    const bool edge = x == width - 1 || (x + 7 * y) % 19 == 0;
+                    edges.at<uchar>(y, x) = edge ? 255 : (x + 3 * y) % 17 == 0 ? 128 : 0;
+                    dx.at<short>(y, x) = 13 * x - 7 * y;
+                    dy.at<short>(y, x) = 5 * y - 11 * x;
+                    if(edge) expected.push_back({x, y, dx.at<short>(y, x), dy.at<short>(y, x)});
+                }
+            for(bool contiguous : {false, true})
+            {
+                cctag::EdgePointCollection points(width, height);
+                cctag::edgesPointsFromCanny(points, contiguous ? edges.clone() : edges,
+                                          contiguous ? dx.clone() : dx, contiguous ? dy.clone() : dy);
+                REQUIRE_EQ(points.get_point_count(), expected.size());
+                for(std::size_t i = 0; i < expected.size(); ++i)
+                {
+                    CHECK_EQ(points(i)->x(), expected[i][0]);
+                    CHECK_EQ(points(i)->y(), expected[i][1]);
+                    CHECK_EQ(points(i)->dX(), expected[i][2]);
+                    CHECK_EQ(points(i)->dY(), expected[i][3]);
+                }
+            }
+        }
 }
 
 TEST_CASE("small_images_avoid_maximum_camera_buffers")

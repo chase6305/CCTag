@@ -35,10 +35,7 @@ EdgePointCollection::EdgePointCollection(size_t w, size_t h) :
   _edgeMapShape[0] = w; _edgeMapShape[1] = h;
   memset(_edgeMap.get(), -1, w*h*sizeof(int));  // XXX@stian: unnecessary for CUDA
   
-  // The existing flag layout stores four point indices in each unsigned word.
-  const size_t flagWords = (std::min(w*h, size_t(MAX_POINTS)) + 3) / 4;
-  memset(_processedIn.get(), 0, flagWords * sizeof(unsigned));
-  memset(_processedAux.get(), 0, flagWords * sizeof(unsigned));
+  // Flag words are initialized as their first point is added.
 }
 
 void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
@@ -61,6 +58,12 @@ void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
   new (&_edgeList[ipoint]) EdgePoint(vx, vy, vdx, vdy);
   _linkList[2*ipoint+0] = -1;
   _linkList[2*ipoint+1] = -1;
+  // Keep the existing four-points-per-word layout without touching unused words.
+  if (ipoint % 4 == 0)
+  {
+    _processedIn[ipoint / 4] = 0;
+    _processedAux[ipoint / 4] = 0;
+  }
   // voter lists must be constructed afterwards
 }
 
