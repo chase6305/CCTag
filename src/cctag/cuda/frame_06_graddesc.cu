@@ -71,7 +71,8 @@ bool gradient_descent_inner( const int                    idx,
                              short2&                      out_edge_d,
                              const cv::cuda::PtrStepSzb   edge_image,
                              const cv::cuda::PtrStepSz16s d_dx,
-                             const cv::cuda::PtrStepSz16s d_dy )
+                             const cv::cuda::PtrStepSz16s d_dy,
+                             const FrameParam& params )
 {
     // const int offset = blockIdx.x * 32 + threadIdx.x;
     // int direction    = threadIdx.y == 0 ? -1 : 1;
@@ -118,7 +119,7 @@ bool gradient_descent_inner( const int                    idx,
         updateXY(dx,dy,x,y,e,stpX,stpY);
     }
     n += 1;
-    if ( dx*dx+dy*dy > tagParam.thrGradientMagInVote ) {
+    if ( dx*dx+dy*dy > params.thrGradientMagInVote ) {
         const float dxRef = dx;
         const float dyRef = dy;
         const float dx2 = out_edge_d.x; // d_dx.ptr(idy)[idx];
@@ -145,7 +146,7 @@ bool gradient_descent_inner( const int                    idx,
         return true;
     }
     
-    while( n <= tagParam.distSearch ) {
+    while( n <= params.distSearch ) {
         if( ady > adx ) {
             updateXY(dy,dx,y,x,e,stpY,stpX);
         } else {
@@ -192,7 +193,8 @@ void gradient_descent( FrameMetaPtr                 meta,
                        const cv::cuda::PtrStepSz16s d_dx,
                        const cv::cuda::PtrStepSz16s d_dy,
                        DevEdgeList<TriplePoint>     voters,    // output
-                       cv::cuda::PtrStepSz32s       edgepoint_index_table ) // output
+                       cv::cuda::PtrStepSz32s       edgepoint_index_table,
+                       const FrameParam params )
 {
     assert( blockDim.x * gridDim.x < meta.list_size_all_edgecoords() + 32 );
     assert( meta.list_size_voters() <= 2*meta.list_size_all_edgecoords() );
@@ -217,7 +219,7 @@ void gradient_descent( FrameMetaPtr                 meta,
                                        out_edge_d,
                                        edge_image,
                                        d_dx,
-                                       d_dy );
+                                       d_dy, params );
     }
 
     __syncthreads();
@@ -330,7 +332,8 @@ void dp_call_01_gradient_descent(
     const cv::cuda::PtrStepSz16s dx, // input
     const cv::cuda::PtrStepSz16s dy, // input
     DevEdgeList<TriplePoint>     chainedEdgeCoords, // output
-    cv::cuda::PtrStepSz32s       edgepointIndexTable ) // output
+    cv::cuda::PtrStepSz32s       edgepointIndexTable,
+    const FrameParam params )
 {
     initChainedEdgeCoords_2( meta, chainedEdgeCoords );
 
@@ -353,7 +356,7 @@ void dp_call_01_gradient_descent(
           dx,
           dy,
           chainedEdgeCoords,  // output - TriplePoints with before/after info
-          edgepointIndexTable ); // output - table, map coord to TriplePoint index
+          edgepointIndexTable, params ); // output - table, map coord to TriplePoint index
 }
 #endif // USE_SEPARABLE_COMPILATION_FOR_GRADDESC
 
@@ -361,7 +364,7 @@ void dp_call_01_gradient_descent(
 
 #ifdef USE_SEPARABLE_COMPILATION_FOR_GRADDESC
 __host__
-bool Frame::applyDesc( )
+bool Frame::applyDesc(const FrameParam& params)
 {
     descent::dp_call_01_gradient_descent
         <<<1,1,0,_stream>>>
@@ -371,13 +374,13 @@ bool Frame::applyDesc( )
           _d_dx,                          // input
           _d_dy,                          // input
           _voters.dev,                    // output
-          _vote._d_edgepoint_index_table ); // output
+          _vote._d_edgepoint_index_table, params ); // output
     POP_CHK_CALL_IFSYNC;
     return true;
 }
 #else // not USE_SEPARABLE_COMPILATION_FOR_GRADDESC
 __host__
-bool Frame::applyDesc( )
+bool Frame::applyDesc(const FrameParam& params)
 {
     descent::initChainedEdgeCoords
         <<<1,1,0,_stream>>>
@@ -409,7 +412,7 @@ bool Frame::applyDesc( )
           _d_dx,
           _d_dy,
           _voters.dev,    // output - TriplePoints with before/after info
-          _vote._d_edgepoint_index_table ); // output - table, map coord to TriplePoint index
+          _vote._d_edgepoint_index_table, params ); // output - table, map coord to TriplePoint index
     POP_CHK_CALL_IFSYNC;
 
     return true;

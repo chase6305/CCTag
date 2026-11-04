@@ -73,8 +73,7 @@ get_scatter_matrix(It begin, It end, const Eigen::Vector2f& offset)
   const size_t n = end - begin;
   MatrixX3f D1(n,3), D2(n,3);
   
-  // Construct the quadratic and linear parts.  Doing it in two loops has better cache locality.
-  // TODO@stian: Make an nx6 matrix and define D1 and D2 as subblocks so that they're as one memory block
+  // Construct the quadratic and linear design matrices for the centered points.
   for (size_t i = 0; begin != end; ++begin, ++i) {
     D1.row(i) = qf(begin);
     D2.row(i) = lf(begin);
@@ -227,93 +226,79 @@ template void fitEllipse(std::vector<cctag::Point2d<Eigen::Vector3f>>::const_ite
 
 } // geometry
 
-float innerProdMin(const std::vector<cctag::EdgePoint*>& filteredChildren, float thrCosDiffMax, Point2d<Vector3s> & p1, Point2d<Vector3s> & p2) {
+float innerProdMin(const std::vector<EdgePoint*>& points,
+                   float cosineThreshold,
+                   Point2d<Vector3s>& firstEndpoint,
+                   Point2d<Vector3s>& secondEndpoint)
+{
+    float minimumProduct = 1.1f;
+    if(points.size() < 2)
+        return minimumProduct;
 
-            EdgePoint* pAngle1 = nullptr;
-            EdgePoint* pAngle2 = nullptr;
+    const EdgePoint& reference = *points.front();
+    const float referenceNorm = reference.normGradient();
+    const float referenceGradientX = reference.dX() / referenceNorm;
+    const float referenceGradientY = reference.dY() / referenceNorm;
+    const EdgePoint* leastAlignedPoint = nullptr;
+    float maximumDistance = 0.f;
 
-            float min = 1.1f;
+    // An early threshold crossing is enough to accept the points for ellipse growing.
+    for(auto point = points.begin() + 1; point != points.end(); ++point)
+    {
+        const EdgePoint& current = **point;
+        const float gradientNorm = current.normGradient();
+        const float gradientX = current.dX() / gradientNorm;
+        const float gradientY = current.dY() / gradientNorm;
+        const float product = referenceGradientX * gradientX + referenceGradientY * gradientY;
+        if(product <= cosineThreshold)
+            return product;
 
-            float distMax = 0.f;
-
-            EdgePoint* p0 = filteredChildren.front();
-
-            if (!filteredChildren.empty())
-            {
-
-                float normGrad = std::sqrt(p0->dX() * p0->dX() + p0->dY() * p0->dY());
-
-                // Step 1
-                float gx0 = p0->dX() / normGrad;
-                float gy0 = p0->dY() / normGrad;
-
-                std::vector<cctag::EdgePoint*>::const_iterator it = ++filteredChildren.begin();
-
-                for (; it != filteredChildren.end(); ++it) {
-                    EdgePoint* pCurrent = *it;
-
-                    normGrad = std::sqrt(pCurrent->dX() * pCurrent->dX() + pCurrent->dY() * pCurrent->dY());
-
-                    float gx = pCurrent->dX() / normGrad;
-                    float gy = pCurrent->dY() / normGrad;
-
-                    float innerProd = gx0 * gx + gy0 * gy;
-
-                    if (innerProd <= thrCosDiffMax)
-                        return innerProd;
-
-                    if (innerProd < min) {
-                        min = innerProd;
-                        pAngle1 = pCurrent;
-                    }
-
-                    float dist = cctag::numerical::distancePoints2D(*p0, *pCurrent);
-                    if (dist > distMax) {
-                        distMax = dist;
-                        p1 = *pCurrent;
-                    }
-                }
-
-                normGrad = std::sqrt(pAngle1->dX() * pAngle1->dX() + pAngle1->dY() * pAngle1->dY());
-                float gxmin = pAngle1->dX() / normGrad;
-                float gymin = pAngle1->dY() / normGrad;
-
-                // Step 2, compute the minimum inner product
-                min = 1.f;
-                distMax = 0.f;
-
-                it = filteredChildren.begin();
-
-                //CCTAG_COUT(" 2- 2eme element" << **it);
-
-                for (; it != filteredChildren.end(); ++it) {
-                    EdgePoint* pCurrent = *it;
-
-                    normGrad = std::sqrt(pCurrent->dX() * pCurrent->dX() + pCurrent->dY() * pCurrent->dY());
-
-                    float chgx = pCurrent->dX() / normGrad;
-                    float chgy = pCurrent->dY() / normGrad;
-
-                    float innerProd = gxmin * chgx + gymin * chgy;
-
-                    if (innerProd <= thrCosDiffMax)
-                        return innerProd;
-
-                    if (innerProd < min) {
-                        min = innerProd;
-                        pAngle2 = pCurrent;
-                    }
-
-                    float dist = cctag::numerical::distancePoints2D(p1, (Point2d<Vector3s>)(*pCurrent));
-                    if (dist > distMax) {
-                        distMax = dist;
-                        p2 = *pCurrent;
-                    }
-                }
-            }
-
-            return min;
+        if(product < minimumProduct)
+        {
+            minimumProduct = product;
+            leastAlignedPoint = &current;
         }
+
+        const float distance = distancePoints2D(reference, current);
+        if(distance > maximumDistance)
+        {
+            maximumDistance = distance;
+            firstEndpoint = current;
+        }
+    }
+
+    if(!leastAlignedPoint)
+        return minimumProduct;
+    if(maximumDistance == 0.f)
+        firstEndpoint = reference;
+
+    const float referenceMinimumNorm = leastAlignedPoint->normGradient();
+    const float minimumGradientX = leastAlignedPoint->dX() / referenceMinimumNorm;
+    const float minimumGradientY = leastAlignedPoint->dY() / referenceMinimumNorm;
+    minimumProduct = 1.f;
+    maximumDistance = 0.f;
+
+    for(const EdgePoint* point : points)
+    {
+        const float gradientNorm = point->normGradient();
+        const float gradientX = point->dX() / gradientNorm;
+        const float gradientY = point->dY() / gradientNorm;
+        const float product = minimumGradientX * gradientX + minimumGradientY * gradientY;
+        if(product <= cosineThreshold)
+            return product;
+
+        minimumProduct = std::min(minimumProduct, product);
+        const float distance = distancePoints2D(firstEndpoint, Point2d<Vector3s>(*point));
+        if(distance > maximumDistance)
+        {
+            maximumDistance = distance;
+            secondEndpoint = *point;
+        }
+    }
+    if(maximumDistance == 0.f)
+        secondEndpoint = firstEndpoint;
+    return minimumProduct;
+}
 
 
 void ellipseFitting(cctag::numerical::geometry::Ellipse& e, const std::vector<Point2d<Eigen::Vector3f>>& points)

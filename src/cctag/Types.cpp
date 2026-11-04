@@ -9,17 +9,22 @@
 #include <cctag/Types.hpp>
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
 namespace cctag
 {
 
 namespace
 {
-size_t checkedArea(size_t w, size_t h, size_t maxArea)
+size_t checkedArea(size_t width, size_t height, size_t maximumArea)
 {
-  if (w != 0 && h > maxArea / w)
+  // EdgePoint stores zero-based coordinates in Scalar.
+  constexpr size_t maximumDimension = static_cast<size_t>(std::numeric_limits<EdgePoint::Scalar>::max()) + 1;
+  if (width > maximumDimension || height > maximumDimension)
+    throw std::length_error("EdgePointCollection: image coordinates do not fit EdgePoint storage");
+  if (width != 0 && height > maximumArea / width)
     throw std::length_error("EdgePointCollection: image resolution is too large");
-  return w*h;
+  return width * height;
 }
 }
 
@@ -28,17 +33,14 @@ EdgePointCollection::EdgePointCollection(size_t w, size_t h) :
   _edgeList(new EdgePoint[std::min(w*h, MAX_POINTS)]),
   _linkList(new int[2*std::min(w*h, MAX_POINTS)]),
   _votersIndex(new int[std::min(w*h, MAX_POINTS)+CUDA_OFFSET+1]),
-  _processedIn(new unsigned[(std::min(w*h, MAX_POINTS)+3)/4]),
-  _processedAux(new unsigned[(std::min(w*h, MAX_POINTS)+3)/4])
+  _processedIn(new std::atomic<bool>[std::min(w*h, MAX_POINTS)]),
+  _processedAux(new std::atomic<bool>[std::min(w*h, MAX_POINTS)])
 {
   point_count() = 0;
   _edgeMapShape[0] = w; _edgeMapShape[1] = h;
-  memset(_edgeMap.get(), -1, w*h*sizeof(int));  // XXX@stian: unnecessary for CUDA
+  memset(_edgeMap.get(), -1, w*h*sizeof(int)); // -1 denotes pixels without an edge point.
   
-  // The existing flag layout stores four point indices in each unsigned word.
-  const size_t flagWords = (std::min(w*h, size_t(MAX_POINTS)) + 3) / 4;
-  memset(_processedIn.get(), 0, flagWords * sizeof(unsigned));
-  memset(_processedAux.get(), 0, flagWords * sizeof(unsigned));
+  // Flags are initialized only when their point is added.
 }
 
 void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
@@ -50,17 +52,17 @@ void EdgePointCollection::add_point(int vx, int vy, float vdx, float vdy)
   if (_edgeMap[imap] != -1)
     throw std::logic_error("EdgePointCollection::add_point: point already exists");
 
-  // XXX@stian: new() below is technically UB, but the class has no defined dtors
-  // so it's safe to re-new it in place w/o calling the dtor firs.
-  
   if (point_count() >= MAX_POINTS)
     throw std::logic_error(std::string("EdgePointCollection::add_point: too many edge points (nb points: ") + std::to_string(point_count()) + ", max: " + std::to_string(MAX_POINTS) + ")");
   
   size_t ipoint = point_count()++;
   _edgeMap[imap] = ipoint;
+  // Replacing this array element with the same type starts its new lifetime.
   new (&_edgeList[ipoint]) EdgePoint(vx, vy, vdx, vdy);
   _linkList[2*ipoint+0] = -1;
   _linkList[2*ipoint+1] = -1;
+  std::atomic_init(&_processedIn[ipoint], false);
+  std::atomic_init(&_processedAux[ipoint], false);
   // voter lists must be constructed afterwards
 }
 

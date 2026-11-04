@@ -35,6 +35,16 @@
 namespace cctag
 {
 
+namespace
+{
+std::uint64_t processedMask(std::size_t runId)
+{
+  if(runId >= EdgePoint::MAX_PROCESSED_RUNS)
+    throw std::out_of_range("EllipseGrowing: runId must be between 0 and 63");
+  return std::uint64_t{1} << runId;
+}
+}
+
 bool initMarkerCenter(cctag::Point2d<Eigen::Vector3f> & markerCenter,
         const std::vector< std::vector< Point2d<Eigen::Vector3f> > > & markerPoints,
         int realPixelPerimeter)
@@ -97,12 +107,13 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
     itp->reserve(filteredChildren.size());
   }
 
-  std::list<EdgePoint*> vProcessedEdgePoint;
+  // Candidates may share flow points, so deduplication belongs to this call.
+  std::vector<bool> processedPoints(edgeCollection.get_point_count(), false);
 
   DO_TALK( CCTAG_COUT_VAR_DEBUG(outerEllipse); )
 
-  Eigen::Vector2f gradE(2);
-  Eigen::Vector2f toto(2);
+  Eigen::Vector2f normalizedGradient(2);
+  Eigen::Vector2f directionToCenter(2);
 
   std::size_t nGradientOut = 0;
   std::size_t nAddedPoint = 0;
@@ -132,31 +143,34 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
       }
 
 
-      if (!edgeCollection.test_processed_aux(p))
+      const int pointIndex = edgeCollection(p);
+      if(pointIndex < 0)
+        throw std::out_of_range("addCandidateFlowtoCCTag: missing edge point");
+      if (!processedPoints[pointIndex])
       {
         //CCTAG_COUT(*p);
 
-        edgeCollection.set_processed_aux(p, true);
-        vProcessedEdgePoint.push_back(p);
+        processedPoints[pointIndex] = true;
 
-        float normGrad = std::sqrt(p->dX() * p->dX() + p->dY() * p->dY());
+        float normGrad = p->normGradient();
 
-        gradE(0) = p->dX() / normGrad;
-        gradE(1) = p->dY() / normGrad;
+        normalizedGradient(0) = p->dX() / normGrad;
+        normalizedGradient(1) = p->dY() / normGrad;
 
-        toto(0) = outerEllipse.center().x() - p->x();
-        toto(1) = outerEllipse.center().y() - p->y();
+        directionToCenter(0) = outerEllipse.center().x() - p->x();
+        directionToCenter(1) = outerEllipse.center().y() - p->y();
 
-        float distancePointToCenter = std::sqrt(toto(0) * toto(0) + toto(1) * toto(1));
-        toto(0) /= distancePointToCenter;
-        toto(1) /= distancePointToCenter;
+        const float distancePointToCenter = std::sqrt(
+            directionToCenter(0) * directionToCenter(0) + directionToCenter(1) * directionToCenter(1));
+        directionToCenter(0) /= distancePointToCenter;
+        directionToCenter(1) /= distancePointToCenter;
 
         DirectedPoint2d<Eigen::Vector3f> pointToAdd(p->x(), p->y(), p->dX(), p->dY());
 
         if (isInEllipse(outerEllipse, pointToAdd) && isOnTheSameSide(outerPoint, pointToAdd, lineThroughCenter))
           // isInHull( innerBoundEllipse, outerEllipse, pMid ) && isInHull( innerBoundEllipse, outerEllipse, pointToAdd ) &&
         {
-          if ((float(-dir) * gradE.dot(toto) < -0.5f) && (j >= numCircles - 2))
+          if ((float(-dir) * normalizedGradient.dot(directionToCenter) < -0.5f) && (j >= numCircles - 2))
           {
             ++nGradientOut;
           }
@@ -172,18 +186,12 @@ bool addCandidateFlowtoCCTag(EdgePointCollection& edgeCollection,
           CCTagFileDebug::instance().outputFlowComponentAssemblingInfos(PTS_OUT_WHILE_ASSEMBLING);
           cctagPoints.clear();
 
-          for (EdgePoint* point : vProcessedEdgePoint)
-            edgeCollection.set_processed_aux(point, false);
-
           return false;
         }
       }
       dir = -dir;
     }
   }
-
-  for (EdgePoint* point : vProcessedEdgePoint)
-    edgeCollection.set_processed_aux(point, false);
 
   //std::cin.ignore().get();
 
@@ -279,7 +287,7 @@ numerical::geometry::Circle computeCircleFromOuterEllipsePoints(const std::vecto
 
   if (std::abs(pMax->cast<float>().dot(l)) / normL < 1e-6)
   {
-    float normGrad = std::sqrt(pMax->dX() * pMax->dX() + pMax->dY() * pMax->dY());
+    float normGrad = pMax->normGradient();
     float gx = pMax->dX() / normGrad;
     float gy = pMax->dY() / normGrad;
     equiPoint.x() = (pMax->x() + distanceToAdd * gx);
@@ -325,9 +333,14 @@ void connectedPoint(std::vector<EdgePoint*>& pts, int runId,
         const EdgePointCollection& img, numerical::geometry::Ellipse& qIn,
         numerical::geometry::Ellipse& qOut, int x, int y)
 {
-  assert(img(x,y));
-  const size_t threadMask = (size_t)1 << runId;
-  img(x,y)->_processed |= threadMask;  // Set as processed
+  const auto threadMask = processedMask(static_cast<std::size_t>(runId));
+  if(x < 0 || y < 0 || static_cast<std::size_t>(x) >= img.shape()[0]
+     || static_cast<std::size_t>(y) >= img.shape()[1])
+    throw std::out_of_range("connectedPoint: coordinates are outside the collection");
+  EdgePoint* const startPoint = img(x,y);
+  if(!startPoint)
+    throw std::invalid_argument("connectedPoint: no edge point at the requested coordinates");
+  startPoint->_processed.fetch_or(threadMask, std::memory_order_relaxed);
 
   static int xoff[] = {1, 1, 0, -1, -1, -1, 0, 1};
   static int yoff[] = {0, -1, -1, -1, 0, 1, 1, 1};
@@ -343,20 +356,20 @@ void connectedPoint(std::vector<EdgePoint*>& pts, int runId,
 
       if (e && // If unprocessed
           isInHull(qIn, qOut, e) &&
-          !(e->_processed & threadMask))
+          !(e->_processed.load(std::memory_order_relaxed) & threadMask))
       {
-        Eigen::Vector2f gradE;
-        gradE(0) = e->dX();
-        gradE(1) = e->dY();
+        Eigen::Vector2f gradient;
+        gradient(0) = e->dX();
+        gradient(1) = e->dY();
         
         Eigen::Vector2f eO;
         eO(0) = qIn.center().x() - e->x();
         eO(1) = qIn.center().y() - e->y();
 
-        if (gradE.dot(eO) < 0)
+        if (gradient.dot(eO) < 0)
         {
           pts.push_back(e);
-          e->_processed |= threadMask;
+          // Recursive entry marks the point, avoiding a second atomic update here.
           connectedPoint(pts, runId, img, qIn, qOut, sx, sy);
         }
       }
@@ -386,6 +399,8 @@ void ellipseHull(const EdgePointCollection& img,
         float delta,
         std::size_t runId)
 {
+  // Check before narrowing to connectedPoint's signed runId parameter.
+  processedMask(runId);
   numerical::geometry::Ellipse qIn, qOut;
   computeHull(ellipse, delta, qIn, qOut);
 
@@ -407,13 +422,13 @@ void ellipseGrowing2(
         std::size_t runId,
         bool goodInit)
 {
-  const size_t threadMask = (size_t)1 << runId;
+  const auto threadMask = processedMask(runId);
   outerEllipsePoints.reserve(filteredChildren.size()*3);
 
   for(EdgePoint * children : filteredChildren)
   {
     outerEllipsePoints.push_back(children);
-    children->_processed |= threadMask;
+    children->_processed.fetch_or(threadMask, std::memory_order_relaxed);
   }
 
   int lastSizePoints = 0;
@@ -478,12 +493,12 @@ void ellipseGrowing2(
     for(auto & vedgePoint: edgePointsSets)
     {
       for(auto & point: vedgePoint)
-        point->_processed &= ~threadMask; // Could be any value different of runId
+        point->_processed.fetch_and(~threadMask, std::memory_order_relaxed);
     }
     // Set as processed all the outerEllipsePoints
     for(auto & point: outerEllipsePoints)
     {
-      point->_processed |= threadMask;
+      point->_processed.fetch_or(threadMask, std::memory_order_relaxed);
     }
     
   }

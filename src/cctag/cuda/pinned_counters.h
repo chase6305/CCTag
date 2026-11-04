@@ -35,7 +35,7 @@ public:
 
     static void setGlobalMax( int max_counters, int max_points );
 
-    static void init( int tagPipe );
+    static void init(int tagPipe, int maxCounters = -1, int maxPoints = -1);
     static void release( int tagPipe );
 
     static int& getCounter( int tagPipe );
@@ -58,6 +58,8 @@ private:
     int          _allocated_counters;
     NearbyPoint* _nearby_points;
     int          _nearby_point_counter;
+    int          _counterCapacity{};
+    int          _pointCapacity{};
 
     std::mutex _lock;
 
@@ -65,7 +67,7 @@ private:
     static int  _max_counters;
     static int  _max_points;
 
-    void         obj_init( );
+    void         obj_init(int maxCounters, int maxPoints);
     int&         obj_getCounter( );
     NearbyPoint& obj_getPoint( const char* file, int line );
     NearbyPoint* obj_getPointPtr( const char* file, int line );

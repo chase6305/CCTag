@@ -8,7 +8,9 @@
 #ifndef _CCTAG_LEVEL_HPP
 #define	_CCTAG_LEVEL_HPP
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+
+#include <cstddef>
 
 namespace cctag {
     class TagPipe;
@@ -25,6 +27,9 @@ public:
   Level( std::size_t width, std::size_t height, int debug_info_level, bool cuda_allocates = false );
   
   ~Level( );
+
+  Level(const Level&) = delete;
+  Level& operator=(const Level&) = delete;
 
   void setLevel( const cv::Mat & src,
                  float thrLowCanny,

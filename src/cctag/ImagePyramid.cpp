@@ -12,6 +12,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <iostream>
+#include <sstream>
 #include <string>
 
 namespace cctag {
@@ -21,14 +22,23 @@ ImagePyramid::ImagePyramid()
 }
 
 ImagePyramid::ImagePyramid( std::size_t width, std::size_t height, std::size_t nLevels, bool cuda_allocates )
+  : _levels(nLevels, nullptr)
 {
-  _levels.clear();
-  _levels.resize(nLevels);
-  for(int i = 0; i < nLevels ; ++i)
+  try
   {
-    _levels[i] = new Level( width, height, i, cuda_allocates );
-    width /= 2;
-    height /= 2;
+    for(std::size_t levelIndex = 0; levelIndex < nLevels; ++levelIndex)
+    {
+      _levels[levelIndex] = new Level(width, height, levelIndex, cuda_allocates);
+      width /= 2;
+      height /= 2;
+    }
+  }
+  catch(...)
+  {
+    // A failed constructor does not run the pyramid's destructor.
+    for(Level* level : _levels)
+      delete level;
+    throw;
   }
 }
 
@@ -42,13 +52,15 @@ void ImagePyramid::build( const cv::Mat & src, float thrLowCanny, float thrHighC
     }
 #endif // CCTAG_WITH_CUDA
 
-    /* The pyramid building function is never called if CUDA is used.
-     */
-  _levels[0]->setLevel( src , thrLowCanny, thrHighCanny, params );
+  if(_levels.empty())
+    return;
+
+  _levels.front()->setLevel(src, thrLowCanny, thrHighCanny, params);
   
-  for(int i = 1; i < _levels.size() ; ++i)
+  for(std::size_t levelIndex = 1; levelIndex < _levels.size(); ++levelIndex)
   {
-    _levels[i]->setLevel( _levels[i-1]->getSrc(), thrLowCanny, thrHighCanny, params );
+    _levels[levelIndex]->setLevel(_levels[levelIndex - 1]->getSrc(),
+                                  thrLowCanny, thrHighCanny, params);
   }
   
 #ifdef CCTAG_SERIALIZE
@@ -90,11 +102,11 @@ void ImagePyramid::build( const cv::Mat & src, float thrLowCanny, float thrHighC
 
 ImagePyramid::~ImagePyramid()
 {
-  for(auto & _level : _levels)
+  for(Level* level : _levels)
   {
-    delete _level;
+    delete level;
   }
-};
+}
 
 std::size_t ImagePyramid::getNbLevels() const
 {
@@ -106,29 +118,9 @@ Level* ImagePyramid::getLevel( std::size_t level ) const
         return _levels[level];
 }
 
-void toUchar(const cv::Mat & src, cv::Mat & dst)
+void sIntToUchar(const cv::Mat& src, cv::Mat& dst)
 {
-  std::size_t width = src.cols;
-  std::size_t height = src.rows;
-  dst = cv::Mat(height, width, CV_8UC1);
-  
-  double min = 0;
-  double max = 0;
-  
-  cv::minMaxLoc(src, &min, &max);
-  
-  CCTAG_COUT_VAR(min);
-  CCTAG_COUT_VAR(max);
-  
-  float scale = 255/(max-min);
-  
-  for ( int i=0 ; i < width ; ++i)
-  {
-    for ( int j=0 ; j < height ; ++j)
-    {
-      dst.at<uchar>(j,i) = (uchar) ((src.at<short>(j,i)+min)*scale);
-    }
-  }
+  cv::normalize(src, dst, 0, 255, cv::NORM_MINMAX, CV_8U);
 }
 
 }

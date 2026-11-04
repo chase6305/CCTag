@@ -10,11 +10,13 @@
 #include "tag.h"
 #include "frame.h"
 #include "frameparam.h"
-#include "clamp.h"
 #include "assist.h"
 #include "geom_matrix.h"
 #include "nearby_point.h"
 #include "tag_cut.h"
+
+#include <cmath>
+#include <stdexcept>
 
 #if 1
     __device__ __host__
@@ -53,8 +55,9 @@ __device__
 inline
 float getPixelBilinear( const cv::cuda::PtrStepSzb src, float2 xy )
 {
-    const int px = clamp( (int)xy.x, src.cols ); // floor of x
-    const int py = clamp( (int)xy.y, src.rows ); // floor of y
+    // The caller has checked that the full 2x2 neighborhood is in bounds.
+    const int px = static_cast<int>(xy.x);
+    const int py = static_cast<int>(xy.y);
 
     // uint8_t p0 = src.ptr(py  )[px  ];
     const uint8_t p1 = src.ptr(py  )[px  ];
@@ -96,31 +99,39 @@ void extractSignalUsingHomography( const CutStruct&                   cut,
 
     // Compute the steps stepX and stepY along x and y.
     const int   nSamples = STRICT_SIGSIZE(cut.sigSize);
+    if(nSamples < 2)
+    {
+        if(threadIdx.x == 0) signals.outOfBounds = 1;
+        return;
+    }
     const float stepX = ( xStop - xStart ) / ( STRICT_SIGSIZE(nSamples) - 1.0f );
     const float stepY = ( yStop - yStart ) / ( STRICT_SIGSIZE(nSamples) - 1.0f );
     const float stepX32 = 32.0f * stepX;
     const float stepY32 = 32.0f * stepY;
 
-    // float x =  xStart; - serial code
-    // float y =  yStart; - serial code
     float x =  xStart + threadIdx.x * stepX;
     float y =  yStart + threadIdx.x * stepY;
-    for( std::size_t i = threadIdx.x; i < STRICT_SIGSIZE(nSamples); i += 32 ) {
+    // Every lane participates in the bounds vote, including the final partial warp.
+    for( std::size_t sampleBase = 0; sampleBase < nSamples; sampleBase += 32 ) {
+        const std::size_t sampleIndex = sampleBase + threadIdx.x;
+        const bool hasSample = sampleIndex < nSamples;
         float2 xyRes;
 
         // [xRes;yRes;1] ~= mHomography*[x;y;1.0]
         xyRes = mHomography.applyHomography( x, y );
 
-        bool breaknow = ( xyRes.x < 1.0f && xyRes.x > src.cols-1 && xyRes.y < 1.0f && xyRes.y > src.rows-1 );
+        const bool inBounds = xyRes.x >= 0.f && xyRes.x < src.cols - 1
+                           && xyRes.y >= 0.f && xyRes.y < src.rows - 1;
 
-        if( cctag::any( breaknow ) )
+        if( cctag::any( hasSample && !inBounds ) )
         {
             if( threadIdx.x == 0 ) signals.outOfBounds = 1;
             return;
         }
 
         // Bilinear interpolation
-        signals.sig[i] = cctag::identification::getPixelBilinear( src, xyRes );
+        if(hasSample)
+            signals.sig[sampleIndex] = cctag::identification::getPixelBilinear( src, xyRes );
 
         x += stepX32;
         y += stepY32;
@@ -140,9 +151,10 @@ void idGetSignals( cv::cuda::PtrStepSzb   src,
                    const int              vCutSize,
                    const NearbyPointGrid* point_buffer,
                    const CutStructGrid*   cut_buffer,
-                   CutSignalGrid*         sig_buffer )
+                   CutSignalGrid*         sig_buffer,
+                   const FrameParam params )
 {
-    const size_t gridNSample = STRICT_SAMPLE(tagParam.gridNSample);
+    const size_t gridNSample = STRICT_SAMPLE(params.gridNSample);
     const int i = blockIdx.y;
     const int j = blockIdx.z;
     const int nearbyPointIndex = j * STRICT_SAMPLE(gridNSample) + i;
@@ -174,9 +186,10 @@ void initAllNearbyPoints(
     const cctag::geometry::matrix3x3  mT,
     float2                             center,
     const float                        neighbourSize,
-    NearbyPointGrid*                   d_nearbyPointGrid )
+    NearbyPointGrid*                   d_nearbyPointGrid,
+    const FrameParam params )
 {
-    const size_t gridNSample = STRICT_SAMPLE(tagParam.gridNSample);
+    const size_t gridNSample = STRICT_SAMPLE(params.gridNSample);
 
     assert( gridDim.y == STRICT_SAMPLE(gridNSample) );
     assert( gridDim.z == STRICT_SAMPLE(gridNSample) );
@@ -229,9 +242,10 @@ __global__
 void idComputeResult( NearbyPointGrid*     d_NearbyPointGrid,
                       const CutStructGrid* cut_buffer,
                       const CutSignalGrid* sig_buffer,
-                      const int            vCutSize )
+                      const int            vCutSize,
+                      const FrameParam params )
 {
-    const size_t gridNSample = STRICT_SAMPLE(tagParam.gridNSample);
+    const size_t gridNSample = STRICT_SAMPLE(params.gridNSample);
     const int grid_i   = blockIdx.y;
     const int grid_j   = blockIdx.z;
     const int grid_idx = grid_j * STRICT_SAMPLE(gridNSample) + grid_i;
@@ -253,7 +267,7 @@ void idComputeResult( NearbyPointGrid*     d_NearbyPointGrid,
         // const CutSignals* r_signals = &allcut_signals[left_cut];
         const CutSignals& l_signals = sig_buffer->getGrid( left_cut,  grid_i, grid_j );
         const CutSignals& r_signals = sig_buffer->getGrid( right_cut, grid_i, grid_j );
-        comp  = ( threadIdx.x < tagParam.sampleCutLength ) &&
+        comp  = ( threadIdx.x < params.sampleCutLength ) &&
                   ! l_signals.outOfBounds &&
                   ! r_signals.outOfBounds;
         if( comp ) {
@@ -340,7 +354,7 @@ void idBestNearbyPoint32plus( NearbyPointGrid* d_NearbyPointGrid,
     // phase 2: reduce to let thread 0 know the best point
     #pragma unroll
     for( int shft=4; shft>=0; shft-- ) {
-        int otherRes = cctag::shuffle_down( bestRes, (1 << shft) );
+        float otherRes = cctag::shuffle_down( bestRes, (1 << shft) );
         int otherIdx = cctag::shuffle_down( bestIdx, (1 << shft) );
         if( otherRes < bestRes ) {
             bestRes = otherRes;
@@ -357,8 +371,8 @@ void idBestNearbyPoint32plus( NearbyPointGrid* d_NearbyPointGrid,
             const NearbyPoint& src_point = d_NearbyPointGrid->getGrid(x,y);
             NearbyPoint&       dst_point = d_NearbyPointGrid->getGrid(0,0);
             memcpy( &dst_point, &src_point, sizeof( NearbyPoint ) );
-            dst_point.residual = bestRes;
         }
+        d_NearbyPointGrid->getGrid(0,0).residual = bestRes;
     }
 }
 
@@ -385,7 +399,7 @@ void idBestNearbyPoint31max( NearbyPointGrid* d_NearbyPointGrid,
     // phase 2: reduce to let thread 0 know the best point
     #pragma unroll
     for( int shft=4; shft>=0; shft-- ) {
-        int otherRes = cctag::shuffle_down( bestRes, (1 << shft) );
+        float otherRes = cctag::shuffle_down( bestRes, (1 << shft) );
         int otherIdx = cctag::shuffle_down( bestIdx, (1 << shft) );
         if( otherRes < bestRes ) {
             bestRes = otherRes;
@@ -402,8 +416,8 @@ void idBestNearbyPoint31max( NearbyPointGrid* d_NearbyPointGrid,
             const NearbyPoint& src_point = d_NearbyPointGrid->getGrid(x,y);
             NearbyPoint&       dst_point = d_NearbyPointGrid->getGrid(0,0);
             memcpy( &dst_point, &src_point, sizeof( NearbyPoint ) );
-            dst_point.residual = bestRes;
         }
+        d_NearbyPointGrid->getGrid(0,0).residual = bestRes;
     }
 }
 
@@ -436,6 +450,8 @@ bool TagPipe::idCostFunction(
 {
     if( vCutSize < 2 ) return false;
 
+    const FrameParam deviceParams(params);
+
     const size_t gridNSample = params._imagedCenterNGridSample;
     const size_t offset      = tagIndex * STRICT_SAMPLE(gridNSample) * STRICT_SAMPLE(gridNSample);
 
@@ -448,23 +464,22 @@ bool TagPipe::idCostFunction(
     cctag::geometry::matrix3x3 mT;
     ellipse.makeConditionerFromEllipse( mT );
     cctag::geometry::matrix3x3 mInvT;
-    bool success;
-    success = mT.invert( mInvT ); // note: returns false if it fails
-    if( ! success ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    Conditioner matrix extracted from ellipse is not invertable" << endl
-             << "    Program logic error. Requires analysis before fixing." << endl
-             << endl;
-    }
+    if(!mT.invert(mInvT))
+        return false;
 
     cctag::geometry::ellipse transformedEllipse;
     ellipse.projectiveTransform( mInvT, transformedEllipse );
+    if(!std::isfinite(transformedEllipse.a()) || !std::isfinite(transformedEllipse.b()) ||
+       transformedEllipse.a() <= 0.f || transformedEllipse.b() <= 0.f)
+        return false;
 
     bool first_iteration = true;
 
     for( ; iterations>0; iterations-- ) {
         float neighSize = currentNeighbourSize * max( transformedEllipse.a(),
                                                       transformedEllipse.b() );
+        if(!std::isfinite(neighSize))
+            return false;
 
         dim3 block( 1, 1, 1 );
         dim3 grid( 1, STRICT_SAMPLE(gridNSample), STRICT_SAMPLE(gridNSample) );
@@ -476,7 +491,7 @@ bool TagPipe::idCostFunction(
               mT,
               center,
               neighSize,
-              d_NearbyPointGrid );
+              d_NearbyPointGrid, deviceParams );
 
         dim3 get_block( 32, STRICT_CUTSIZE(vCutSize), 1 ); // we use this to sum up signals
         dim3 get_grid( 1, STRICT_SAMPLE(gridNSample), STRICT_SAMPLE(gridNSample) );
@@ -487,7 +502,7 @@ bool TagPipe::idCostFunction(
               STRICT_CUTSIZE(vCutSize),
               d_NearbyPointGrid,        // in
               cut_buffer,
-              sig_buffer );
+              sig_buffer, deviceParams );
 
         dim3 id_block( 32, // we use this to sum up signals
                        32, // we can use some shared memory/warp magic for summing
@@ -502,7 +517,7 @@ bool TagPipe::idCostFunction(
             ( d_NearbyPointGrid,
               cut_buffer,
               sig_buffer,
-              STRICT_CUTSIZE(vCutSize) );
+              STRICT_CUTSIZE(vCutSize), deviceParams );
 
         /* We search for the minimum of gridNSample x gridNSample
          * nearby points. Default for gridNSample is 5.
@@ -541,18 +556,26 @@ void TagPipe::imageCenterOptLoop(
     const cctag::Parameters&            params,
     NearbyPoint*                        cctag_pointer_buffer )
 {
-    if( vCutSize != 22 ) {
-        cerr << __FILE__ << ":" << __LINE__ << endl
-             << "    " << __func__ << " is called from CPU code with vCutSize " << vCutSize << " instead of 22" << endl;
-        if( vCutSize > 22 ) {
-            exit( -1 );
-        }
-    }
+    const FrameParam frameParams(params);
+    if(vCutSize < 0 || vCutSize > frameParams.numCutsInIdentStep)
+        throw std::invalid_argument("CUDA cut count must be between 0 and _numCutsInIdentStep");
+    if(!std::isfinite(outerEllipse.a()) || !std::isfinite(outerEllipse.b()) ||
+       outerEllipse.a() <= 0.f || outerEllipse.b() <= 0.f ||
+       !std::isfinite(outerEllipse.angle()) ||
+       !std::isfinite(outerEllipse.center().x) || !std::isfinite(outerEllipse.center().y) ||
+       !std::isfinite(center.x) || !std::isfinite(center.y))
+        throw std::invalid_argument("CUDA center refinement requires a finite ellipse with positive axes");
+    for(int row = 0; row < 3; ++row)
+        for(int col = 0; col < 3; ++col)
+            if(!std::isfinite(outerEllipse.matrix()(row, col)))
+                throw std::invalid_argument("CUDA center refinement requires a finite ellipse matrix");
 
     const float  maxSemiAxis   = std::max( outerEllipse.a(), outerEllipse.b() );
-    const size_t gridNSample   = params._imagedCenterNGridSample;
+    const size_t gridNSample   = frameParams.gridNSample;
     float        neighbourSize = params._imagedCenterNeighbourSize;
     int          iterations    = 0;
+    if(!std::isfinite(neighbourSize * maxSemiAxis))
+        throw std::invalid_argument("CUDA center refinement search width must be finite");
 
     while( neighbourSize*maxSemiAxis > 0.02 ) {
         iterations += 1;
@@ -560,6 +583,12 @@ void TagPipe::imageCenterOptLoop(
     }
 
     neighbourSize = params._imagedCenterNeighbourSize;
+    if(iterations == 0)
+    {
+        // Measure the supplied center without expanding a zero or subpixel search.
+        iterations = 1;
+        neighbourSize = 0.f;
+    }
 
     NearbyPointGrid* d_nearbyPointGrid = getNearbyPointGridBuffer( tagIndex );
 

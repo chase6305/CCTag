@@ -8,6 +8,7 @@
 #ifndef _CCTAG_MARKERS_TYPES_HPP_
 #define _CCTAG_MARKERS_TYPES_HPP_
 
+#include <atomic>
 #include <memory>
 #include <new>
 #include <stdexcept>
@@ -38,32 +39,29 @@ private:
   std::unique_ptr<int[]> _votersIndex;  // with CUDA_OFFSET; [0] is point count
   std::unique_ptr<int[]> _votersList;
   
-  // These are used only on the CPU.
-  std::unique_ptr<unsigned[]> _processedIn;
-  std::unique_ptr<unsigned[]> _processedAux;
+  // Independent CPU flags avoid read-modify-write races between neighboring points.
+  std::unique_ptr<std::atomic<bool>[]> _processedIn;
+  std::unique_ptr<std::atomic<bool>[]> _processedAux;
   size_t _edgeMapShape[2]{};
-  
-  static_assert(sizeof(unsigned) == 4, "unsigned has wrong size");
   
   int& point_count() { return _votersIndex[0]; }
   int point_count() const { return _votersIndex[0]; }
   size_t map_index(int x, int y) const { return x + y * _edgeMapShape[0]; }
   
-  static void set_bit(unsigned* v, size_t i, bool f)
+  static void set_flag(std::atomic<bool>* flags, size_t index, bool processed)
   {
-    if (i >= MAX_POINTS)
-      throw std::out_of_range("EdgePointCollection::set_bit");
-    if (f) v[i/4] |=   1U << (i & 31);
-    else   v[i/4] &= ~(1U << (i & 31));
+    if(index >= MAX_POINTS)
+      throw std::out_of_range("EdgePointCollection::set_flag");
+    flags[index].store(processed, std::memory_order_relaxed);
   }
-  
-  static bool test_bit(unsigned* v, size_t i)
+
+  static bool test_flag(const std::atomic<bool>* flags, size_t index)
   {
-    if (i >= MAX_POINTS)
-      throw std::out_of_range("EdgePointCollection::test_bit");
-    return v[i/4] & (1U << (i & 31));
+    if(index >= MAX_POINTS)
+      throw std::out_of_range("EdgePointCollection::test_flag");
+    return flags[index].load(std::memory_order_relaxed);
   }
-  
+
 public:
   EdgePointCollection() = default;
   
@@ -142,22 +140,22 @@ public:
   
   void set_processed_in(EdgePoint* p, bool f)
   {
-    set_bit(&_processedIn[0], (*this)(p), f);
+    set_flag(_processedIn.get(), (*this)(p), f);
   }
   
   bool test_processed_in(EdgePoint* p)
   {
-    return test_bit(&_processedIn[0], (*this)(p));
+    return test_flag(_processedIn.get(), (*this)(p));
   }
   
   void set_processed_aux(EdgePoint* p, bool f)
   {
-    set_bit(&_processedAux[0], (*this)(p), f);
+    set_flag(_processedAux.get(), (*this)(p), f);
   }
   
   bool test_processed_aux(EdgePoint* p)
   {
-    return test_bit(&_processedAux[0], (*this)(p));
+    return test_flag(_processedAux.get(), (*this)(p));
   }
 };
 

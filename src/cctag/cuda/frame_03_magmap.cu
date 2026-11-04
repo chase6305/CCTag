@@ -48,19 +48,20 @@ void compute_mag_l2( cv::cuda::PtrStepSz16s src_dx,
 
     if( outOfBounds( idx, idy, dst ) ) return;
 
-    int16_t dx = src_dx.ptr(idy)[idx];
-    int16_t dy = src_dy.ptr(idy)[idx];
-    // --- rintf( hypot ( ) ) --
-    dx *= dx;
-    dy *= dy;
-    dst.ptr(idy)[idx] = __fsqrt_rn( (float)( dx + dy ) );
+    const int32_t derivativeX = src_dx.ptr(idy)[idx];
+    const int32_t derivativeY = src_dy.ptr(idy)[idx];
+    // The squared sum reaches 2^31 for (-32768, -32768).
+    const uint32_t magnitudeSquared = static_cast<uint32_t>(derivativeX * derivativeX) +
+                                      static_cast<uint32_t>(derivativeY * derivativeY);
+    dst.ptr(idy)[idx] = static_cast<uint32_t>(__fsqrt_rn(static_cast<float>(magnitudeSquared)));
 }
 
 __global__
 void compute_map( const cv::cuda::PtrStepSz16s dx,
                   const cv::cuda::PtrStepSz16s dy,
                   const cv::cuda::PtrStepSz32u mag,
-                  cv::cuda::PtrStepSzb         map )
+                  cv::cuda::PtrStepSzb         map,
+                  const FrameParam params )
 {
     const int CANNY_SHIFT = 15;
     const int TG22 = (int32_t)(0.4142135623730950488016887242097*(1<<CANNY_SHIFT) + 0.5);
@@ -87,7 +88,7 @@ void compute_map( const cv::cuda::PtrStepSz16s dx,
     // 2 - the pixel does belong to an edge
     uint8_t edge_type = 0;
 
-    if( magVal > tagParam.cannyThrLow_x_256 )
+    if( magVal > params.cannyThrLow_x_256 )
     {
         const int32_t tg22x = dxVal * TG22;
         const int32_t tg67x = tg22x + ((dxVal + dxVal) << CANNY_SHIFT);
@@ -106,7 +107,7 @@ void compute_map( const cv::cuda::PtrStepSz16s dx,
         y.y = clamp( y.y, dx.rows );
 
         if( magVal > mag.ptr(y.x)[x.x] && magVal >= mag.ptr(y.y)[x.y] ) {
-            edge_type = 1 + (uint8_t)(magVal > tagParam.cannyThrHigh_x_256);
+            edge_type = 1 + (uint8_t)(magVal > params.cannyThrHigh_x_256);
         }
     }
     __syncthreads();
@@ -116,7 +117,7 @@ void compute_map( const cv::cuda::PtrStepSz16s dx,
 }
 
 __host__
-void Frame::applyMag( )
+void Frame::applyMag(const FrameParam& params)
 {
     dim3 block( 32, 1, 1 );
     dim3 grid( grid_divide( getWidth(), 32 ), getHeight(), 1 );
@@ -128,7 +129,7 @@ void Frame::applyMag( )
 
     compute_map
         <<<grid,block,0,_stream>>>
-        ( _d_dx, _d_dy, _d_mag, _d_map );
+        ( _d_dx, _d_dy, _d_mag, _d_map, params );
 
     /* block download until MAG and MAP are ready */
     cudaEventRecord( _download_ready_event.magmap, _stream );

@@ -189,7 +189,7 @@ void Frame::applyThinning( )
               << "num of edge points after thinning: " << val << std::endl
               << "num of edge points added to list:  " << _all_edgecoords.host.size << std::endl
               << "edgemax: " << EDGE_POINT_MAX << std::endl;
-    _all_edgecoords.copyDataFromDeviceSync( );
+    if( _all_edgecoords.host.size > 0 ) _all_edgecoords.copyDataFromDeviceSync( );
 
 #else // NDEBUG
     _meta.toDevice( List_size_all_edgecoords, 0, _stream );

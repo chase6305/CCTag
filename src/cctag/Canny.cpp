@@ -20,12 +20,15 @@ void edgesPointsFromCanny(
 {
   std::size_t width = edges.cols;
   std::size_t height = edges.rows;
+  if(width == 0)
+    return;
   
   for( int y = 0 ; y < height ; ++y )
   {
+    const uchar* row = &edges.at<uchar>(y, 0);
     for( int x = 0 ; x < width ; ++x )
     {
-      if ( edges.at<uchar>(y,x) == 255 )
+      if ( row[x] == 255 )
       {
         edgeCollection.add_point(x, y, dx.at<short>(y,x), dy.at<short>(y,x));
       }

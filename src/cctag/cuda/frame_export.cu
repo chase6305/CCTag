@@ -32,7 +32,7 @@ bool Frame::applyExport( cctag::EdgePointCollection& out_edges,
     // assert( out_edges.points().size() == 0 );
     // assert( out_edges.map().size() == 0 );
     assert( out_seedlist.size() == 0 );
-    assert( vote_sz <= all_sz );
+    assert( vote_sz <= all_sz + 1 ); // Index zero is reserved for the null voter.
 
     if( vote_sz <= 0 ) {
         // no voting happened, no need for edge linking,

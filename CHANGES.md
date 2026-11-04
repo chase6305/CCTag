@@ -11,7 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Compute the CPU center objective in linear time using double-precision
+  accumulation; batch candidate sorting, reuse temporary storage, and avoid
+  per-ID allocations during profile voting.
+- CUDA pipelines own their parameters and pass configuration to each kernel.
+  Reused pipelines apply parameter changes and rebuild resources when needed.
+- Reject malformed or empty marker banks without partially changing an existing
+  bank. Bank matching requires finite queries of equal length.
+- Owning `Level` and `ImagePyramid` objects are no longer copyable. Rebuild
+  consumers together with the library after upgrading.
+
 ### Fixed
+
+- Fix candidate-score overflow, lost processed flags, component-label races,
+  and run-ID bounds. Keep assembly deduplication local to each candidate.
+- Reset sampling bounds for each center candidate and reject undersampled or
+  zero-contrast profiles and grids that cannot shrink during optimization.
+- Exclude flat and non-finite profiles from ID voting.
+- Fix CUDA magnitude overflow and uploading non-contiguous image views.
+- Fix CUDA sampling bounds and floating-point residual selection; evaluate
+  zero-width searches and upload later tags when the first tag has no cuts.
+- Reject CUDA configurations beyond the supported grid, cut, and signal sizes.
+- Fix CUDA worker shutdown, pinned-memory cleanup, pipeline-ID reuse, and
+  per-pipeline configuration isolation.
+- Preserve CCTag metadata when copying and cloning; initialize default geometry
+  and keep circle counts consistent with the marker geometry.
+- Fix signed-image debug conversion, including constant images.
 
 ### Removed
 

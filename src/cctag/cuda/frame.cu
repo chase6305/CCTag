@@ -7,6 +7,7 @@
  */
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <assert.h>
 #include <fstream>
 #include <string.h>
@@ -81,6 +82,7 @@ Frame::Frame( uint32_t width, uint32_t height, int my_layer, cudaStream_t downlo
 
 Frame::~Frame( )
 {
+    uploadComplete();
     deleteUploadEvent( );
 
     releaseRequiredMem( );
@@ -107,28 +109,37 @@ Frame::~Frame( )
     POP_CUDA_STREAM_DESTROY( _stream );
 }
 
-void Frame::upload( const unsigned char* image )
+void Frame::upload( const unsigned char* image, std::size_t rowStride )
 {
+    if(rowStride == 0)
+        rowStride = getWidth();
+    if(rowStride < getWidth())
+        throw std::invalid_argument("CUDA image row stride is smaller than its width");
+    if(getHeight() > 1
+       && rowStride > (std::numeric_limits<std::size_t>::max() - getWidth()) / (getHeight() - 1))
+        throw std::invalid_argument("CUDA image span exceeds the addressable size");
+
     DO_TALK(
       cerr << "source w=" << _d_plane.cols
-           << " source pitch=" << _d_plane.cols
+           << " source pitch=" << rowStride
            << " dest pitch=" << _d_plane.step
            << " height=" << _d_plane.rows
            << endl;)
 
     // pin the image to memory
     _image_to_upload = image;
+    _image_to_upload_bytes = (getHeight() - 1) * rowStride + getWidth();
 
 #ifdef _MSC_VER
-    VirtualLock(LPVOID(_image_to_upload), (getWidth() * getHeight()));
+    VirtualLock(LPVOID(_image_to_upload), _image_to_upload_bytes);
 #else
-    mlock( _image_to_upload, getWidth() * getHeight() );
+    mlock( _image_to_upload, _image_to_upload_bytes );
 #endif
 
     POP_CUDA_MEMCPY_2D_ASYNC( _d_plane.data,
                               getPitch(),
                               _image_to_upload,
-                              getWidth(),
+                              rowStride,
                               getWidth(),
                               getHeight(),
                               cudaMemcpyHostToDevice,
@@ -141,11 +152,12 @@ void Frame::uploadComplete( )
     // unpin the image
     if( _image_to_upload != 0 ) {
 #ifdef _MSC_VER
-        VirtualUnlock(LPVOID(_image_to_upload), (getWidth() * getHeight()));
+        VirtualUnlock(LPVOID(_image_to_upload), _image_to_upload_bytes);
 #else
-        munlock( _image_to_upload, getWidth() * getHeight() );
+        munlock( _image_to_upload, _image_to_upload_bytes );
 #endif
         _image_to_upload = 0;
+        _image_to_upload_bytes = 0;
     }
 }
 
@@ -204,7 +216,11 @@ void Frame::allocUploadEvent( )
 
 void Frame::deleteUploadEvent( )
 {
-    cudaEventDestroy( _wait_for_upload );
+    if(_wait_for_upload)
+    {
+        cudaEventDestroy(_wait_for_upload);
+        _wait_for_upload = nullptr;
+    }
 }
 
 void Frame::addUploadEvent( )

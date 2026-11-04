@@ -34,22 +34,23 @@ namespace cctag {
 struct NumVotersIsGreaterEqual
 {
     DevEdgeList<TriplePoint> _array;
+    int _minimumVotes;
 
     __host__ __device__
     __forceinline__
-    NumVotersIsGreaterEqual( DevEdgeList<TriplePoint> _d_array )
-        : _array( _d_array )
+    NumVotersIsGreaterEqual(DevEdgeList<TriplePoint> array, int minimumVotes)
+        : _array(array), _minimumVotes(minimumVotes)
     {}
 
     __device__
     __forceinline__
     bool operator()(const int &a) const {
-        return (_array.ptr[a]._winnerSize >= tagParam.minVotesToSelectCandidate );
+        return (_array.ptr[a]._winnerSize >= _minimumVotes );
     }
 };
 
 __host__
-bool Frame::applyVoteIf( )
+bool Frame::applyVoteIf(const FrameParam& params)
 {
     if( _interm_inner_points.host.size == 0 ) {
         return false;
@@ -61,7 +62,7 @@ bool Frame::applyVoteIf( )
     thrust::device_ptr<int> output_begin = thrust::device_pointer_cast( _inner_points.dev.ptr );
     thrust::device_ptr<int> output_end;
 
-    NumVotersIsGreaterEqual select_op( _voters.dev );
+    NumVotersIsGreaterEqual select_op(_voters.dev, params.minVotesToSelectCandidate);
 
 #ifdef CCTAG_NO_THRUST_COPY_IF
     //

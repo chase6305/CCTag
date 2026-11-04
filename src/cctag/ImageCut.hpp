@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 #ifndef _CCTAG_LINE_HPP_
-#define	_CCTAG_LINE_HPP_
+#define _CCTAG_LINE_HPP_
 
 #include <cctag/geometry/Point.hpp>
 #include <cctag/Params.hpp>
@@ -16,87 +16,73 @@ namespace cctag {
 
 class ImageCut
 {
-  
 public:
-  ImageCut()
-  {
-    _outOfBounds = false;
-  }
- 
-  ImageCut( Point2d<Eigen::Vector3f> pStart, DirectedPoint2d<Eigen::Vector3f> pStop )
-  : _start(pStart), _stop(pStop), _outOfBounds(false), _beginSig(0.f), _endSig(1.f)
-  {
-    _imgSignal.resize(cctag::kDefaultSampleCutLength);
-  }
+    ImageCut() = default;
+
+    ImageCut(Point2d<Eigen::Vector3f> start, DirectedPoint2d<Eigen::Vector3f> stop)
+      : ImageCut(start, stop, 0.f, 1.f, kDefaultSampleCutLength)
+    {}
+
+    ImageCut(Point2d<Eigen::Vector3f> start,
+             DirectedPoint2d<Eigen::Vector3f> stop,
+             float signalBegin,
+             float signalEnd)
+      : ImageCut(start, stop, signalBegin, signalEnd, kDefaultSampleCutLength)
+    {}
+
+    ImageCut(Point2d<Eigen::Vector3f> start,
+             DirectedPoint2d<Eigen::Vector3f> stop,
+             std::size_t sampleCount)
+      : ImageCut(start, stop, 0.f, 1.f, sampleCount)
+    {}
+
+    ImageCut(Point2d<Eigen::Vector3f> start,
+             DirectedPoint2d<Eigen::Vector3f> stop,
+             float signalBegin,
+             float signalEnd,
+             std::size_t sampleCount)
+      : _start(start), _stop(stop), _imgSignal(sampleCount), _beginSig(signalBegin), _endSig(signalEnd)
+    {}
+
+    ImageCut(const ImageCut&) = default;
+    ImageCut& operator=(const ImageCut&) = default;
+    ImageCut(ImageCut&&) = default;
+    ImageCut& operator=(ImageCut&&) = default;
   
-  ImageCut( Point2d<Eigen::Vector3f> pStart, DirectedPoint2d<Eigen::Vector3f> pStop, const float start, const float stop)
-  : _start(pStart), _stop(pStop), _outOfBounds(false), _beginSig(start), _endSig(stop)
-  {
-    _imgSignal.resize(cctag::kDefaultSampleCutLength);
-    _outOfBounds = false;
-  }
-  
-  ImageCut( Point2d<Eigen::Vector3f> pStart, DirectedPoint2d<Eigen::Vector3f> pStop, const std::size_t nSamples)
-  : _start(pStart), _stop(pStop), _beginSig(0.f), _endSig(1.f), _outOfBounds(false)
-  {
-    _imgSignal.resize(nSamples);
-  }
-    
-  ImageCut( Point2d<Eigen::Vector3f> pStart, DirectedPoint2d<Eigen::Vector3f> pStop, const float start, const float stop, const std::size_t nSamples)
-  : _start(pStart), _stop(pStop), _outOfBounds(false), _beginSig(start), _endSig(stop)
-  {
-    _imgSignal.resize(nSamples);
-    _outOfBounds = false;
-  }
-  
-  const Point2d<Eigen::Vector3f> & start() const { return _start; }
-  Point2d<Eigen::Vector3f> & start() { return _start; }
-  
-  const DirectedPoint2d<Eigen::Vector3f> & stop() const { return _stop; }
-  DirectedPoint2d<Eigen::Vector3f> & stop() { return _stop; }
-  
-  const std::vector<float> & imgSignal() const { return _imgSignal; }
-  std::vector<float> & imgSignal() { return _imgSignal; }
-  
-  float beginSig() const { return _beginSig; }
-  
-  float endSig() const { return _endSig; }
-  
-  bool outOfBounds() const { return _outOfBounds; }
-  
-  void setOutOfBounds(const bool outOfBounds) { _outOfBounds = outOfBounds; }
-  
-  virtual ~ImageCut() = default;
-  
+    const Point2d<Eigen::Vector3f>& start() const { return _start; }
+    Point2d<Eigen::Vector3f>& start() { return _start; }
+
+    const DirectedPoint2d<Eigen::Vector3f>& stop() const { return _stop; }
+    DirectedPoint2d<Eigen::Vector3f>& stop() { return _stop; }
+
+    const std::vector<float>& imgSignal() const { return _imgSignal; }
+    std::vector<float>& imgSignal() { return _imgSignal; }
+
+    float beginSig() const { return _beginSig; }
+    float endSig() const { return _endSig; }
+
+    bool outOfBounds() const { return _outOfBounds; }
+    void setOutOfBounds(bool outOfBounds) { _outOfBounds = outOfBounds; }
+
+    virtual ~ImageCut() = default;
+
 private:
-  
-  /** Start point of the image cut
-   * @todo This value is invalid after the optimization (neither CPU or GPU)
-   */
-  Point2d<Eigen::Vector3f> _start;
-  
-  // Stop point of the image cut
-  DirectedPoint2d<Eigen::Vector3f> _stop;
-  
-  /** 1D rectified image signal along the segment [_start,_stop]
-   * @note For the GPU case, this information never exists on the CPU
-   */
-  std::vector<float> _imgSignal; //< image signal
-  
-  // False by default. This boolean reveals if any of the points lying on the segment
-  // [_start, _stop] are outside of the image
-  bool _outOfBounds;
-  
-  // Scalar value in [0,1] representing from where, along the segment [_start,_stop] 
-  // whose extremities corresponds to 0 and 1 resp., the image signal in stored in 
-  // _imgSignal 
-  float _beginSig;
-  
-  // Scalar value in [_beginSig,1] representing to where, along the segment [_start,_stop] 
-  // whose extremities corresponds to 0 and 1 resp., the image signal in stored in 
-  // _imgSignal
-  float _endSig;
-  
+    // Initial image center; center optimization does not update this point.
+    Point2d<Eigen::Vector3f> _start;
+
+    // Outer edge point and its image gradient.
+    DirectedPoint2d<Eigen::Vector3f> _stop;
+
+    // Sampled image signal, rectified when read through the optimized homography.
+    std::vector<float> _imgSignal;
+
+    // True when the cut cannot be sampled from the image.
+    bool _outOfBounds = false;
+
+    // Sampled interval along the cut, where 0 is the center and 1 is the outer edge.
+    float _beginSig = 0.f;
+    float _endSig = 1.f;
+
 };
 
 }

@@ -14,6 +14,11 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <mutex>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <stdexcept>
 
 #include "debug_image.h"
 #include "cctag/utils/Talk.hpp"
@@ -54,11 +59,15 @@ using namespace std;
 
 namespace cctag
 {
-int TagPipe::_tag_id_running_number = 0;
+namespace {
+std::array<bool, MAX_PIPES> activePipeIds{};
+std::mutex pipeIdMutex;
+}
 
 __host__
 TagPipe::TagPipe( const cctag::Parameters& params )
     : _params( params )
+    , _frameParams(params)
     , _d_cut_struct_grid( 0 )
     , _h_cut_struct_grid( 0 )
     , _d_nearby_point_grid( 0 )
@@ -67,9 +76,41 @@ TagPipe::TagPipe( const cctag::Parameters& params )
     , _num_nearby_point_grid( 0 )
     , _num_cut_signal_grid( 0 )
 {
-    _tag_id = _tag_id_running_number;
-    _tag_id_running_number++;
+    std::lock_guard<std::mutex> lock(pipeIdMutex);
+    const auto slot = std::find(activePipeIds.begin(), activePipeIds.end(), false);
+    if(slot == activePipeIds.end())
+        throw std::runtime_error("Maximum number of active CUDA pipelines exceeded");
+    _tag_id = static_cast<int>(slot - activePipeIds.begin());
+    *slot = true;
     cerr << "Creating TagPipe " << _tag_id << endl;
+}
+
+TagPipe::~TagPipe()
+{
+    release();
+    std::lock_guard<std::mutex> lock(pipeIdMutex);
+    activePipeIds[_tag_id] = false;
+}
+
+void TagPipe::configure(uint32_t width, uint32_t height, const cctag::Parameters& params,
+                        cctag::logtime::Mgmt* durations)
+{
+    const FrameParam frameParams(params);
+    int deviceId;
+    auto error = cudaGetDevice(&deviceId);
+    POP_CUDA_FATAL_TEST(error, "Could not query the CUDA device");
+    if(_deviceId >= 0 && deviceId != _deviceId)
+        throw std::invalid_argument("CUDA pipeline belongs to a different device");
+    if(_initialized && (getWidth(0) != width || getHeight(0) != height ||
+                        _frame.size() != params._numberOfMultiresLayers ||
+                        _params._pinnedCounters != params._pinnedCounters ||
+                        _params._pinnedNearbyPoints != params._pinnedNearbyPoints))
+        release();
+
+    _params = params;
+    _frameParams = frameParams;
+    if(!_initialized)
+        initialize(width, height, durations);
 }
 
 __host__
@@ -77,17 +118,28 @@ void TagPipe::initialize( const uint32_t pix_w,
                           const uint32_t pix_h,
                           cctag::logtime::Mgmt* durations )
 {
+    if(pix_w == 0 || pix_h == 0 || _params._numberOfMultiresLayers == 0 ||
+       _params._numberOfMultiresLayers > FRAME_META_MAX_LEVELS)
+        throw std::invalid_argument("CUDA pipeline dimensions and layer count are invalid");
+    if(_params._pinnedCounters == 0 || _params._pinnedNearbyPoints == 0 ||
+       _params._pinnedCounters > std::numeric_limits<int>::max() ||
+       _params._pinnedNearbyPoints > std::numeric_limits<int>::max())
+        throw std::invalid_argument("CUDA pinned memory capacities are out of range");
+    int deviceId;
+    auto error = cudaGetDevice(&deviceId);
+    POP_CUDA_FATAL_TEST(error, "Could not query the CUDA device");
+    if(_deviceId >= 0 && deviceId != _deviceId)
+        throw std::invalid_argument("CUDA pipeline belongs to a different device");
+    _deviceId = deviceId;
     cerr << "Initializing TagPipe " << _tag_id << endl;
-    PinnedCounters::init( getId() );
+    if(_initialized)
+        release();
+    PinnedCounters::init(getId(), _params._pinnedCounters, _params._pinnedNearbyPoints);
+    _initialized = true;
 
-    static bool tables_initialized = false;
-    if( ! tables_initialized ) {
-        tables_initialized = true;
-        Frame::initGaussTable( );
-        Frame::initThinningTable( );
-    }
-
-    FrameParam::init( _params );
+    // Each selected device needs its own copy of these immutable tables.
+    Frame::initGaussTable();
+    Frame::initThinningTable();
 
     int num_layers = _params._numberOfMultiresLayers;
     _frame.reserve( num_layers );
@@ -123,19 +175,51 @@ void TagPipe::initialize( const uint32_t pix_w,
     }
     cudaEventCreate( &_uploaded_event );
 
-    _threads.init( this, num_layers );
+    _threads.init(num_layers, [this](int layer) {
+        const auto error = cudaSetDevice(_deviceId);
+        if(error != cudaSuccess)
+            throw std::runtime_error(cudaGetErrorString(error));
+        handleframe(layer);
+    });
 }
 
 __host__
 void TagPipe::release( )
 {
-    cerr << "Releasing TagPipe " << _tag_id << endl;
-    cudaEventDestroy( _uploaded_event );
-    for( int i=0; i<NUM_ID_STREAMS; i++ ) {
-        POP_CUDA_STREAM_DESTROY( _tag_streams[i] );
-    }
+    _threads.stop();
+    if(!_initialized)
+        return;
 
-    PinnedCounters::release( getId() );
+    int previousDevice;
+    auto error = cudaGetDevice(&previousDevice);
+    POP_CUDA_FATAL_TEST(error, "Could not query the CUDA device during release");
+    error = cudaSetDevice(_deviceId);
+    POP_CUDA_FATAL_TEST(error, "Could not select the pipeline's CUDA device during release");
+    cerr << "Releasing TagPipe " << _tag_id << endl;
+    for(auto& stream : _tag_streams)
+    {
+        if(stream)
+        {
+            cudaStreamSynchronize(stream);
+            POP_CUDA_STREAM_DESTROY(stream);
+            stream = nullptr;
+        }
+    }
+    if(_uploaded_event)
+    {
+        cudaEventDestroy(_uploaded_event);
+        _uploaded_event = nullptr;
+    }
+    freeCutStructGridBuffer();
+    freeNearbyPointGridBuffer();
+    freeSignalGridBuffer();
+    for(Frame* frame : _frame)
+        delete frame;
+    _frame.clear();
+    PinnedCounters::release(getId());
+    _initialized = false;
+    error = cudaSetDevice(previousDevice);
+    POP_CUDA_FATAL_TEST(error, "Could not restore the CUDA device after release");
 }
 
 __host__
@@ -151,10 +235,10 @@ uint32_t TagPipe::getHeight( size_t layer ) const
 }
 
 __host__
-void TagPipe::load( int frameId, unsigned char* pix )
+void TagPipe::load( int frameId, const unsigned char* pixels, std::size_t rowStride )
 {
     cerr << "Loading image " << frameId << " into TagPipe " << _tag_id << endl;
-    _frame[0]->upload( pix ); // async
+    _frame[0]->upload( pixels, rowStride ); // async
     _frame[0]->addUploadEvent( ); // async
 }
 
@@ -162,6 +246,7 @@ __host__
 void TagPipe::tagframe( )
 {
     _threads.oneRound( );
+    _frame[0]->uploadComplete();
 }
 
 __host__
@@ -181,13 +266,13 @@ void TagPipe::handleframe( int i )
     _frame[i]->applyPlaneDownload(); // async
 
     _frame[i]->applyGauss( _params ); // async
-    _frame[i]->applyMag();  // async
+    _frame[i]->applyMag(_frameParams);  // async
 
     _frame[i]->applyHyst();  // async
     _frame[i]->applyThinning();  // async
 
-    _frame[i]->applyDesc();  // async
-    _frame[i]->applyVoteConstructLine();  // async
+    _frame[i]->applyDesc(_frameParams);  // async
+    _frame[i]->applyVoteConstructLine(_frameParams);  // async
     _frame[i]->applyVoteSortUniq();  // async
 
     _frame[i]->applyGaussDownload(); // async
@@ -195,7 +280,7 @@ void TagPipe::handleframe( int i )
     _frame[i]->applyThinDownload(); // sync
 
     _frame[i]->applyVoteEval();  // async
-    _frame[i]->applyVoteIf();  // async
+    _frame[i]->applyVoteIf(_frameParams);  // async
 
     _frame[i]->applyVoteDownload();   // sync!
 
@@ -334,8 +419,7 @@ bool TagPipe::imageCenterRetrieve(
 void TagPipe::checkTagAllocations( const int                numTags,
                                    const cctag::Parameters& params )
 {
-    const size_t gridNSample = STRICT_SAMPLE( params._imagedCenterNGridSample ); // 5
-    const size_t numCuts     = STRICT_CUTSIZE( params._numCutsInIdentStep ); // 22
+    (void)FrameParam(params);
 
     reallocNearbyPointGridBuffer( numTags ); // each numTags is gridNSample^2 points
     reallocSignalGridBuffer( numTags );      // each numTags is gridNSample^2 * numCuts signals
@@ -347,22 +431,25 @@ void TagPipe::uploadCuts( int                                 numTags,
                           const std::vector<cctag::ImageCut>* vCuts,
                           const cctag::Parameters&            params )
 {
-    if( numTags <= 0 || vCuts == 0 || vCuts->size() == 0 ) return;
+    const FrameParam frameParams(params);
+    if( numTags <= 0 || vCuts == 0 ) return;
 
-    const int max_cuts_per_Tag = STRICT_CUTSIZE( params._numCutsInIdentStep );
+    const int max_cuts_per_Tag = frameParams.numCutsInIdentStep;
 
     cerr << endl << "==== Uploading " << numTags << " tags ====" << endl;
 
     for( int tagIndex=0; tagIndex<numTags; tagIndex++ ) {
         // cerr << "    Tag " << tagIndex << " has " << vCuts[tagIndex].size() << " cuts" << endl;
 
-        CutStructGrid* cutGrid = this->getCutStructGridBufferHost( tagIndex );
+        if(vCuts[tagIndex].size() > static_cast<std::size_t>(max_cuts_per_Tag))
+            throw std::invalid_argument("CUDA cut count exceeds _numCutsInIdentStep");
+        for(const auto& imageCut : vCuts[tagIndex])
+            if(imageCut.imgSignal().size() != params._sampleCutLength)
+                throw std::invalid_argument("CUDA cut signal length must equal _sampleCutLength");
+        if(vCuts[tagIndex].empty())
+            continue;
 
-        if( STRICT_CUTSIZE( vCuts[tagIndex].size() ) > max_cuts_per_Tag ) {
-            cerr << __FILE__ << "," << __LINE__ << ":" << endl
-                 << "    Programming error: assumption that number of cuts for a single tag is < params._numCutsInIdentStep is wrong" << endl;
-            exit( -1 );
-        }
+        CutStructGrid* cutGrid = this->getCutStructGridBufferHost( tagIndex );
 
         std::vector<cctag::ImageCut>::const_iterator vit  = vCuts[tagIndex].begin();
         std::vector<cctag::ImageCut>::const_iterator vend = vCuts[tagIndex].end();
@@ -374,7 +461,7 @@ void TagPipe::uploadCuts( int                                 numTags,
             cutGrid->getGrid(cut).stop.y      = vit->stop().y();
             cutGrid->getGrid(cut).beginSig    = vit->beginSig();
             cutGrid->getGrid(cut).endSig      = vit->endSig();
-            cutGrid->getGrid(cut).sigSize     = STRICT_SIGSIZE( vit->imgSignal().size() );
+            cutGrid->getGrid(cut).sigSize     = static_cast<int>(vit->imgSignal().size());
         }
     }
 

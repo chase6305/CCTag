@@ -16,30 +16,25 @@ namespace cctag {
 namespace numerical {
 namespace optimization {
 
-inline Eigen::Matrix3f conditionerFromEllipse( const cctag::numerical::geometry::Ellipse & ellipse )
+inline Eigen::Matrix3f conditionerFromEllipse(const geometry::Ellipse& ellipse)
 {
-	Eigen::Matrix3f res;
+    Eigen::Matrix3f transform;
+    static const float sqrt2 = std::sqrt(2.f);
+    const float meanSemiAxis = (ellipse.a() + ellipse.b()) / 2.f;
 
-	static const float sqrt2 = std::sqrt( 2.f );
-	static const float meanAB = (ellipse.a()+ellipse.b())/2.f;
+    // Center this ellipse at the origin and scale its mean semi-axis to sqrt(2).
+    transform(0, 0) = sqrt2 / meanSemiAxis;
+    transform(0, 1) = 0.f;
+    transform(0, 2) = -sqrt2 * ellipse.center().x() / meanSemiAxis;
 
-	//[ 2^(1/2)/a,         0, -(2^(1/2)*x0)/a]
-        //[         0, 2^(1/2)/a, -(2^(1/2)*y0)/a]
-        //[         0,         0,               1]
+    transform(1, 0) = 0.f;
+    transform(1, 1) = sqrt2 / meanSemiAxis;
+    transform(1, 2) = -sqrt2 * ellipse.center().y() / meanSemiAxis;
 
-	res( 0, 0 ) = sqrt2 / meanAB;
-	res( 0, 1 ) = 0.f;
-	res( 0, 2 ) = -sqrt2* ellipse.center().x() / meanAB;
-
-	res( 1, 0 ) = 0.f;
-	res( 1, 1 ) = sqrt2 / meanAB;
-	res( 1, 2 ) = -sqrt2* ellipse.center().y() / meanAB;
-
-	res( 2, 0 ) = 0.f;
-	res( 2, 1 ) = 0.f;
-	res( 2, 2 ) = 1.f;
-
-	return res;
+    transform(2, 0) = 0.f;
+    transform(2, 1) = 0.f;
+    transform(2, 2) = 1.f;
+    return transform;
 }
 
 

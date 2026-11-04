@@ -139,6 +139,7 @@ struct Parameters
     float _thrMedianDistanceEllipse;
     ///  number of seeds to process as potential candidates
     std::size_t _maximumNbSeeds;
+    /// Maximum outer-ellipse candidates: 0..64, one processing-mask bit per candidate.
     std::size_t _maximumNbCandidatesLoopTwo;
     ///  number of crowns
     std::size_t _nCrowns;

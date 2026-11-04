@@ -27,11 +27,9 @@ struct FrameParam
     int   gridNSample;
     int   numCutsInIdentStep;
 
-    __host__
-    static void init( const cctag::Parameters& params );
+    explicit FrameParam(const cctag::Parameters& params);
 };
 
-extern __constant__ FrameParam tagParam;
 
 
 } // namespace cctag

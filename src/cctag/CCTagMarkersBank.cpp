@@ -13,12 +13,14 @@
 #include <boost/spirit/include/phoenix_stl.hpp>
 #include <boost/spirit/include/qi.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <vector>
 #include <ios>
 #include <iterator>
 #include <limits>
+#include <stdexcept>
 #include <utility>
 
 namespace cctag
@@ -27,19 +29,20 @@ namespace cctag
 namespace
 {
 
-bool cctagLineParse(std::string::const_iterator first,
-                    std::string::const_iterator last,
-                    std::vector<float>& rr)
+bool parseRadiusRatios(std::string::const_iterator first,
+                      std::string::const_iterator last,
+                      std::vector<float>& radiusRatios)
 {
-  float n;
+  float ratio;
   using boost::phoenix::push_back;
   using namespace boost::spirit::qi;
   using boost::spirit::qi::_1;
   const bool parsed = phrase_parse(first, last,
-    *((uint_[boost::phoenix::ref(n) = _1] >> '/' >>
-       uint_[boost::phoenix::ref(n) = boost::phoenix::ref(n) / _1] |
-       double_[boost::phoenix::ref(n) = _1])
-      [push_back(boost::phoenix::ref(rr), boost::phoenix::ref(n))]),
+    *((uint_[boost::phoenix::ref(ratio) = _1] >> '/' >>
+       uint_[boost::phoenix::ref(ratio) = boost::phoenix::ref(ratio) / _1] |
+       double_[boost::phoenix::ref(ratio) = _1])
+      [push_back(boost::phoenix::ref(radiusRatios), boost::phoenix::ref(ratio))] >>
+      no_skip[&(space | eoi)]),
     space);
   return parsed && first == last;
 }
@@ -50,19 +53,19 @@ CCTagMarkersBank::CCTagMarkersBank( std::size_t nCrowns )
 {
   if ( nCrowns == 3 )
   {
-    _markers.reserve(32);
-    for(const auto & idThreeCrown : CCTagMarkersBank::idThreeCrowns)
+    _markers.reserve(std::size(idThreeCrowns));
+    for(const auto& radiusRatios : idThreeCrowns)
     {
-      _markers.emplace_back(std::begin(idThreeCrown), std::end(idThreeCrown));
+      _markers.emplace_back(std::begin(radiusRatios), std::end(radiusRatios));
     }
     
   }
   else if ( nCrowns == 4 )
   {
-    _markers.reserve(128);
-    for(const auto & idFourCrown : CCTagMarkersBank::idFourCrowns)
+    _markers.reserve(std::size(idFourCrowns));
+    for(const auto& radiusRatios : idFourCrowns)
     {
-      _markers.emplace_back(std::begin(idFourCrown), std::end(idFourCrown));
+      _markers.emplace_back(std::begin(radiusRatios), std::end(radiusRatios));
     }
   }
 }
@@ -73,64 +76,71 @@ CCTagMarkersBank::CCTagMarkersBank( const std::string & file )
 }
 
 
-void CCTagMarkersBank::read( const std::string & file )
+void CCTagMarkersBank::read(const std::string& filename)
 {
-  std::ifstream input( file.c_str() );
-  if ( !input.good() )
-  {
-	throw std::ios_base::failure("Unable to open the bank file: " + file);
-  }
-  std::string str;
-  while ( std::getline( input, str ) )
-  {
-    std::vector<float> rr;
-    cctagLineParse( str.begin(), str.end(), rr);
-    if ( rr.size() )
+    std::ifstream input(filename);
+    if(!input)
+        throw std::ios_base::failure("Unable to open the bank file: " + filename);
+
+    std::vector<std::vector<float>> markers;
+    std::string line;
+    std::size_t lineNumber = 0;
+    while(std::getline(input, line))
     {
-      _markers.push_back( std::move(rr) );
+        ++lineNumber;
+        std::vector<float> radiusRatios;
+        if(!parseRadiusRatios(line.begin(), line.end(), radiusRatios) ||
+           std::any_of(radiusRatios.begin(), radiusRatios.end(),
+                       [](float ratio) { return !std::isfinite(ratio) || ratio <= 0.f; }))
+        {
+            throw std::invalid_argument("Invalid radius ratios in bank file " + filename +
+                                        ":" + std::to_string(lineNumber));
+        }
+        if(!radiusRatios.empty())
+            markers.push_back(std::move(radiusRatios));
     }
-  }
-  input.close();
+    if(input.bad())
+        throw std::ios_base::failure("Unable to read the bank file: " + filename);
+    if(markers.empty())
+        throw std::invalid_argument("Bank file contains no markers: " + filename);
+
+    _markers.insert(_markers.end(),
+                    std::make_move_iterator(markers.begin()),
+                    std::make_move_iterator(markers.end()));
 }
 
 std::size_t CCTagMarkersBank::identify( const std::vector<float> & marker ) const
 {
-  std::vector< std::vector<float> >::const_iterator itm = _markers.begin();
+    if(marker.empty() || std::any_of(marker.begin(), marker.end(),
+                                    [](float ratio) { return !std::isfinite(ratio); }))
+        throw std::invalid_argument("A marker profile must contain finite radius ratios");
 
-  std::size_t imin = 0;
-  float normMin = std::numeric_limits<float>::max();
-  std::size_t i = 0;
-
-  while( itm != _markers.end() )
-  {
-    std::vector<float>::const_iterator itr1 = marker.begin();
-    std::vector<float>::const_iterator itr2 = itm->begin();
-    float norm = 0;
-    while( itr1 != marker.end() && itr2 != itm->end() )
+    std::size_t nearestMarker = 0;
+    float minimumDistance = std::numeric_limits<float>::max();
+    for(std::size_t markerIndex = 0; markerIndex < _markers.size(); ++markerIndex)
     {
-      norm += ( *itr1 - *itr2 ) * ( *itr1 - *itr2 );
-      ++itr1;
-      ++itr2;
-    }
-    ++itm;
-    norm = std::sqrt( norm );
-    CCTAG_COUT_LILIAN( "Res : " << norm );
-    if ( norm < normMin )
-    {
-      normMin = norm;
-      imin = i;
-    }
-    ++i;
-  }
+        const auto& radiusRatios = _markers[markerIndex];
+        if(radiusRatios.size() != marker.size())
+            continue;
 
-  if ( normMin > 0.6f )
-  {
-	  throw std::runtime_error("Unable to identify marker");
-  }
-  else
-  {
-    return imin + 1;
-  }
+        float squaredDistance = 0.f;
+        for(std::size_t ratioIndex = 0; ratioIndex < marker.size(); ++ratioIndex)
+        {
+            const float difference = marker[ratioIndex] - radiusRatios[ratioIndex];
+            squaredDistance += difference * difference;
+        }
+        const float distance = std::sqrt(squaredDistance);
+        CCTAG_COUT_LILIAN("Res : " << distance);
+        if(distance < minimumDistance)
+        {
+            minimumDistance = distance;
+            nearestMarker = markerIndex;
+        }
+    }
+
+    if(minimumDistance > 0.6f)
+        throw std::runtime_error("Unable to identify marker");
+    return nearestMarker + 1;
 }
 
 const float CCTagMarkersBank::idThreeCrowns[32][5] =

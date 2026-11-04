@@ -59,9 +59,25 @@ consumers when upgrading: filesystem helpers now accept `std::filesystem::path`,
 helper uses `std::unordered_set`. The detection API's owning pointer containers
 and serialized XML format are retained.
 
+Edge-processing flags now use atomic storage. `Level` and `ImagePyramid` own
+their resources and cannot be copied. The CPU candidate budget
+`_maximumNbCandidatesLoopTwo` supports values from 0 through 64.
+
+Marker-bank loading rejects malformed, non-finite, non-positive, or empty input.
+A failed read leaves the existing bank intact; successful reads still append.
+
 CUDA builds also propagate the CUDA configuration and toolkit include paths
 through this target. `Parameters::setUseCuda(false)` selects the CPU path in a
 CUDA build; `setUseCuda(true)` selects the GPU path.
+
+Each cached CUDA pipeline owns its configuration. Reusing a pipeline applies
+parameter changes and rebuilds resources when image dimensions, pyramid depth,
+or pinned-memory capacity change. Assign a distinct `pipeId` to concurrent GPU
+calls; each pipeline stays bound to its initial CUDA device.
+CUDA identification supports a 5-by-5 center grid, 2–22 configured cuts, and
+2–100 samples per cut. The relative search width must be finite and nonnegative;
+zero evaluates the supplied center. Unsupported settings throw
+`std::invalid_argument`.
 
 ----------
 

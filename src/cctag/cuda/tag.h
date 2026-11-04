@@ -10,6 +10,7 @@
 #include "cctag/cuda/onoff.h"
 
 #include <string>
+#include <cstddef>
 #include <vector>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -17,6 +18,7 @@
 #include <cctag/cuda/cctag_cuda_runtime.h>
 
 #include "cctag/cuda/tag_threads.h"
+#include "cctag/cuda/frameparam.h"
 #include "cctag/cuda/tag_cut.h"
 #include "cctag/cuda/geom_ellipse.h"
 #include "cctag/cuda/geom_matrix.h"
@@ -40,17 +42,24 @@ class NearbyPointGrid;
 
 class TagPipe
 {
-    static int                  _tag_id_running_number;
-
     int                         _tag_id;
+    int                         _deviceId{-1};
     std::vector<Frame*>         _frame;
-    const cctag::Parameters&    _params;
+    cctag::Parameters           _params;
+    FrameParam                  _frameParams;
     TagThreads                  _threads;
-    cudaStream_t                _tag_streams[NUM_ID_STREAMS];
-    cudaEvent_t                 _uploaded_event;
+    cudaStream_t                _tag_streams[NUM_ID_STREAMS]{};
+    cudaEvent_t                 _uploaded_event{};
+    bool                        _initialized{false};
 
 public:
     TagPipe( const cctag::Parameters& params );
+    ~TagPipe();
+
+    // Reuse allocations when dimensions, layers, and pinned capacities match.
+    // Call only between completed frames of this pipeline.
+    void configure(uint32_t width, uint32_t height, const cctag::Parameters& params,
+                   cctag::logtime::Mgmt* durations);
 
     inline int getId() const { return _tag_id; }
 
@@ -58,7 +67,7 @@ public:
                      const uint32_t pix_h,
                      cctag::logtime::Mgmt* durations );
     void release( );
-    void load( int frameId, unsigned char* pix );
+    void load( int frameId, const unsigned char* pixels, std::size_t rowStride = 0 );
     void tagframe( );
     void handleframe( int layer );
 

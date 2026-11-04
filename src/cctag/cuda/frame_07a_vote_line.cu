@@ -125,7 +125,8 @@ const TriplePoint* cl_inner(
     DevEdgeList<TriplePoint>       voters,
     float*                         chosen_flow_length,
     DevEdgeList<int>               chosen_idx,
-    const cv::cuda::PtrStepSz32s   edgepoint_index_table )
+    const cv::cuda::PtrStepSz32s   edgepoint_index_table,
+    const FrameParam& params )
 {
     const int offset = threadIdx.x + blockIdx.x * 32;
     if( offset >= meta.list_size_voters() ) {
@@ -160,7 +161,7 @@ const TriplePoint* cl_inner(
     // To save all sub-segments length
     int       vDistSize = 0;
 #ifndef NDEBUG
-    const int vDistMax  = tagParam.nCrowns * 2 - 1;
+    const int vDistMax  = params.nCrowns * 2 - 1;
 #endif // NDEBUG
     float     vDist[RESERVE_MEM_MAX_CROWNS * 2 - 1];
     int flagDist = 1;
@@ -185,7 +186,7 @@ const TriplePoint* cl_inner(
     TriplePoint* chosen = 0;
 
     // Iterate over all crowns
-    for( int i=1; i < tagParam.nCrowns; ++i ) {
+    for( int i=1; i < params.nCrowns; ++i ) {
         chosen = 0;
 
         // First in the gradient direction
@@ -216,7 +217,7 @@ const TriplePoint* cl_inner(
         if( vDistSize > 1 ) {
             for( int iDist = 0; iDist < vDistSize; ++iDist ) {
                 for (int jDist = iDist + 1; jDist < vDistSize; ++jDist) {
-                    flagDist = (vDist[iDist] <= vDist[jDist] * tagParam.ratioVoting) && (vDist[jDist] <= vDist[iDist] * tagParam.ratioVoting) && flagDist;
+                    flagDist = (vDist[iDist] <= vDist[jDist] * params.ratioVoting) && (vDist[jDist] <= vDist[iDist] * params.ratioVoting) && flagDist;
                 }
             }
         }
@@ -249,7 +250,7 @@ const TriplePoint* cl_inner(
 
         for( int iDist = 0; iDist < vDistSize; ++iDist ) {
             for (int jDist = iDist + 1; jDist < vDistSize; ++jDist) {
-                flagDist = (vDist[iDist] <= vDist[jDist] * tagParam.ratioVoting) && (vDist[jDist] <= vDist[iDist] * tagParam.ratioVoting) && flagDist;
+                flagDist = (vDist[iDist] <= vDist[jDist] * params.ratioVoting) && (vDist[jDist] <= vDist[iDist] * params.ratioVoting) && flagDist;
             }
         }
 
@@ -294,14 +295,15 @@ void construct_line( FrameMetaPtr                 meta,
                      DevEdgeList<TriplePoint>     voters, // input/output
                      float*                       chosen_flow_length, // output
                      DevEdgeList<int>             chosen_idx,         // output
-                     const cv::cuda::PtrStepSz32s edgepoint_index_table ) // input
+                     const cv::cuda::PtrStepSz32s edgepoint_index_table,
+                     const FrameParam params )
 {
     const TriplePoint* chosen =
         cl_inner( meta,
                   voters,      // input-modified
                   chosen_flow_length, // output
                   chosen_idx, // output
-                  edgepoint_index_table ); // input
+                  edgepoint_index_table, params ); // input
 
     if( chosen && chosen->coord.x == 0 && chosen->coord.y == 0 ) chosen = 0;
 
@@ -335,7 +337,8 @@ void dp_call_construct_line(
     DevEdgeList<TriplePoint> voters,               // ?
     float*                   chosen_flow_length,   // output
     DevEdgeList<int>         chosen_idx,           // output
-    cv::cuda::PtrStepSz32s   edgepointIndexTable ) // ?
+    cv::cuda::PtrStepSz32s   edgepointIndexTable,
+    const FrameParam params )
 {
     meta.list_size_inner_points() = 0;
 
@@ -353,11 +356,11 @@ void dp_call_construct_line(
           voters,                // ?
           chosen_flow_length,
           chosen_idx,
-          edgepointIndexTable ); // ?
+          edgepointIndexTable, params ); // ?
 }
 
 __host__
-bool Frame::applyVoteConstructLine( )
+bool Frame::applyVoteConstructLine(const FrameParam& params)
 {
     _inner_points.host.size = 0;
 
@@ -368,14 +371,14 @@ bool Frame::applyVoteConstructLine( )
           _voters.dev,                      // input-modified
           _v_chosen_flow_length, // output
           _v_chosen_idx.dev,      // output
-          _vote._d_edgepoint_index_table ); // ?
+          _vote._d_edgepoint_index_table, params ); // ?
     POP_CHK_CALL_IFSYNC;
     return true;
 }
 
 #else // not USE_SEPARABLE_COMPILATION_FOR_VOTE_LINE
 __host__
-bool Frame::applyVoteConstructLine( )
+bool Frame::applyVoteConstructLine(const FrameParam& params)
 {
     _voters.copySizeFromDevice( _stream, EdgeListWait );
 
@@ -396,7 +399,7 @@ bool Frame::applyVoteConstructLine( )
           _voters.dev,                      // input-modified
           _v_chosen_flow_length, // output
           _v_chosen_idx.dev,     // output
-          _vote._d_edgepoint_index_table ); // input
+          _vote._d_edgepoint_index_table, params ); // input
     POP_CHK_CALL_IFSYNC;
 
     return true;

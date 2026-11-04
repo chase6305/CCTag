@@ -207,7 +207,13 @@ void cvRecodedCanny(const cv::Mat& imgGraySrc,
                     x = _imgDX[j];
                     y = _imgDY[j];
 #ifdef USE_INTEGER_REP
-                    _mag[j] = (int)rintf((float)std::sqrt((float)x * x + (float)y * y));
+                    const float magnitude = (float)std::sqrt((float)x * x + (float)y * y);
+#if CV_SSE2 && !defined(__CUDACC__)
+                    // SSE2 rounds directly to int using the active rounding mode.
+                    _mag[j] = cvRound(magnitude);
+#else
+                    _mag[j] = (int)rintf(magnitude);
+#endif
 #else
                     _magf[j] = (float)std::sqrt((float)x * x + (float)y * y);
 #endif

@@ -51,6 +51,40 @@ bool fit_and_check_ellipse(const std::vector<Point3f>& pts)
 
 TEST_SUITE("test_ellipseFitting") {
 
+TEST_CASE("parallel_gradients_choose_the_farthest_arc_endpoints")
+{
+    std::vector<cctag::EdgePoint> edges;
+    for(int x : {0, 4, 9, 12, 20})
+        edges.emplace_back(x, 8, 3.f, 4.f);
+    std::vector<cctag::EdgePoint*> points;
+    for(auto& edge : edges)
+        points.push_back(&edge);
+    cctag::Point2d<cctag::Vector3s> first, second;
+
+    CHECK_EQ(cctag::numerical::innerProdMin(points, .25f, first, second), doctest::Approx(1.f));
+    CHECK_EQ(first.x(), 20);
+    CHECK_EQ(first.y(), 8);
+    CHECK_EQ(second.x(), 0);
+    CHECK_EQ(second.y(), 8);
+}
+
+TEST_CASE("perpendicular_gradients_provide_enough_arc_coverage")
+{
+    cctag::EdgePoint horizontal(0, 0, 1.f, 0.f), vertical(1, 1, 0.f, 1.f);
+    const std::vector<cctag::EdgePoint*> points{&horizontal, &vertical};
+    cctag::Point2d<cctag::Vector3s> first, second;
+    CHECK_LE(cctag::numerical::innerProdMin(points, .25f, first, second), .25f);
+}
+
+TEST_CASE("insufficient_and_zero_gradients_do_not_provide_arc_coverage")
+{
+    cctag::Point2d<cctag::Vector3s> first, second;
+    CHECK_GT(cctag::numerical::innerProdMin({}, .25f, first, second), .25f);
+    cctag::EdgePoint zero(0, 0, 0.f, 0.f), anotherZero(2, 3, 0.f, 0.f);
+    CHECK_GT(cctag::numerical::innerProdMin({&zero}, .25f, first, second), .25f);
+    CHECK_GT(cctag::numerical::innerProdMin({&zero, &anotherZero}, .25f, first, second), .25f);
+}
+
 TEST_CASE("test_edge_point_pointers_match_value_fitting")
 {
     std::vector<cctag::EdgePoint> edges;
