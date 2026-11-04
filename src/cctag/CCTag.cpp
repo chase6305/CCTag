@@ -105,14 +105,14 @@ void CCTag::applyScale(float s)
 }
 
 #ifdef CCTAG_WITH_CUDA
-void CCTag::acquireNearbyPointMemory( int tagId )
+void CCTag::acquireNearbyPointMemory( int pipeId )
 {
-    _cuda_result = cctag::PinnedCounters::getPointPtr( tagId, __FILE__, __LINE__ );
+    _cuda_result = cctag::PinnedCounters::getPointPtr( pipeId, __FILE__, __LINE__ );
 }
 
-void CCTag::releaseNearbyPointMemory( int tagId )
+void CCTag::releaseNearbyPointMemory( int pipeId )
 {
-    cctag::PinnedCounters::releaseAllPoints( tagId );
+    cctag::PinnedCounters::releaseAllPoints( pipeId );
 }
 #endif
 

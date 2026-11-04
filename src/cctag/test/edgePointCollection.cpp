@@ -6,7 +6,10 @@
 #include <cctag/Bresenham.hpp>
 #include <cctag/ImagePyramid.hpp>
 #include <cctag/Multiresolution.hpp>
+#include <cctag/Detection.hpp>
+#include <cctag/utils/VisualDebug.hpp>
 #include <opencv2/core.hpp>
+#include <tbb/global_control.h>
 
 #include <algorithm>
 #include <array>
@@ -16,6 +19,7 @@
 #include <memory>
 #include <limits>
 #include <new>
+#include <stdexcept>
 
 namespace
 {
@@ -41,6 +45,85 @@ void operator delete[](void* memory) noexcept { std::free(memory); }
 void operator delete[](void* memory, std::size_t) noexcept { std::free(memory); }
 
 TEST_SUITE("test_edgePointCollection") {
+
+TEST_CASE("candidate_ordering_handles_large_scores_and_ties")
+{
+    tbb::global_control threads(tbb::global_control::max_allowed_parallelism, 1);
+    cctag::EdgePointCollection points(400, 200);
+    points.add_point(2, 2, 100.f, 0.f);
+    points.add_point(4, 2, 100.f, 0.f);
+    const int offsets[][2] = {
+        {40, 0}, {35, 21}, {19, 36}, {0, 39}, {-21, 34}, {-35, 19},
+        {-41, 0}, {-34, -21}, {-20, -35}, {0, -41}, {21, -34}, {36, -19}};
+    for(int center : {100, 300})
+        for(const auto& point : offsets)
+            points.add_point(center + point[0], 100 + point[1], point[0], point[1]);
+
+    int firstVoteCount = 50021;
+    int secondVoteCount = 40009;
+    int selectedGroup = 0;
+    SUBCASE("squaring more than 46340 votes does not overflow") {}
+    SUBCASE("later seed wins equal scores")
+    {
+        secondVoteCount = firstVoteCount;
+        selectedGroup = 1;
+    }
+    SUBCASE("seed without voters cannot become a candidate")
+    {
+        firstVoteCount = 0;
+        selectedGroup = 1;
+    }
+
+    std::vector<std::vector<int>> voters(points.get_point_count());
+    for(int i = 0; i < firstVoteCount; ++i)
+        voters[0].push_back(2 + i % 12);
+    for(int i = 0; i < secondVoteCount; ++i)
+        voters[1].push_back(14 + i % 12);
+    points.create_voter_lists(voters);
+
+    cctag::Parameters params;
+    params._averageVoteMin = std::numeric_limits<float>::max();
+    params._maximumNbCandidatesLoopTwo = 1;
+    const cv::Mat image(200, 400, CV_8UC1, cv::Scalar(0));
+    cctag::CCTag::List tags;
+    cctag::cctagDetectionFromEdges(tags, points, image, {points(0), points(1)},
+                                   0, 0, 1.f, params, nullptr);
+
+    // Outlier removal may discard individual points from the selected component.
+    const int selectedBegin = 2 + selectedGroup * 12;
+    const auto labeledCount = std::count_if(points(selectedBegin), points(selectedBegin + 12),
+        [](const cctag::EdgePoint& point) { return point._nSegmentOut == 0; });
+    CHECK_GE(labeledCount, 5);
+    const int unselectedBegin = 2 + (1 - selectedGroup) * 12;
+    for(int i = unselectedBegin; i < unselectedBegin + 12; ++i)
+        CHECK_EQ(points(i)->_nSegmentOut, -1);
+    cctag::CCTagVisualDebug::instance().clearSessions();
+}
+
+TEST_CASE("candidate_budget_is_limited_to_the_64_bit_processing_mask")
+{
+    const cv::Mat image(64, 64, CV_8UC1, cv::Scalar(0));
+    cctag::Parameters params;
+    params.setUseCuda(false);
+    const cctag::CCTagMarkersBank bank(3);
+    cctag::EdgePointCollection points(image.cols, image.rows);
+    cctag::CCTag::List tags;
+
+    for(const std::size_t budget : {std::size_t(0), std::size_t(64)})
+    {
+        params._maximumNbCandidatesLoopTwo = budget;
+        CHECK_NOTHROW(cctag::cctagDetectionFromEdges(
+            tags, points, image, {}, 0, 0, 1.f, params, nullptr));
+    }
+    for(const std::size_t budget : {std::size_t(65), std::numeric_limits<std::size_t>::max()})
+    {
+        params._maximumNbCandidatesLoopTwo = budget;
+        CHECK_THROWS_AS(cctag::cctagDetectionFromEdges(
+            tags, points, image, {}, 0, 0, 1.f, params, nullptr), std::invalid_argument);
+        CHECK_THROWS_AS(cctag::cctagDetection(
+            tags, 0, 0, image, params, bank, false, nullptr), std::invalid_argument);
+    }
+}
 
 TEST_CASE("processed_flags_start_clear_in_reused_storage")
 {

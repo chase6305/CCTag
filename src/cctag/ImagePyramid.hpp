@@ -10,9 +10,6 @@
 
 #include "cctag/Level.hpp"
 
-#include <opencv2/opencv.hpp>
-
-#include <cstdint>
 #include <cstddef>
 #include <vector>
 
@@ -29,19 +26,22 @@ public:
   
   ~ImagePyramid();
 
+  ImagePyramid(const ImagePyramid&) = delete;
+  ImagePyramid& operator=(const ImagePyramid&) = delete;
+
   Level* getLevel( std::size_t level ) const;
   
   std::size_t getNbLevels() const;
   
-    /* The pyramid building function is never called if CUDA is used.
-     */
+  // Build CPU levels; CUDA levels are populated from the pipeline instead.
   void build(const cv::Mat & src, float thrLowCanny, float thrHighCanny, const cctag::Parameters* params );
 
 private:
   std::vector<Level*> _levels;
 };
 
-void sIntToUchar(const cv::Mat & src, cv::Mat & dst);
+// Scale signed image values to [0, 255]; constant images become zero.
+void sIntToUchar(const cv::Mat& src, cv::Mat& dst);
 
 }
 

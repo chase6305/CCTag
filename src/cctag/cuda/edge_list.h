@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cctag/cuda/cctag_cuda_runtime.h>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -42,6 +43,7 @@ enum EdgeListBlockSizeCopy
 
 template <typename T> struct EdgeList;
 
+// Kernels receive copies of this view; EdgeList controls the allocation lifetime.
 template <typename T>
 struct DevEdgeList
 {
@@ -89,9 +91,12 @@ struct HostEdgeList
         size = 0;
     }
 
+    HostEdgeList(const HostEdgeList&) = delete;
+    HostEdgeList& operator=(const HostEdgeList&) = delete;
+
     ~HostEdgeList( )
     {
-        delete [] ptr;
+        release();
     }
 
 protected:
@@ -104,20 +109,24 @@ protected:
             void* a;
             POP_CUDA_MALLOC_HOST( &a, sz * sizeof(T) );
             ptr = (T*)a;
+            // Initialize each host allocation once; frame resets only reset its size.
+            std::memset(ptr, 0, sz * sizeof(T));
         }
     }
 
     __host__
     void init( int sz )
     {
-        if( ptr ) memset( ptr, 0, sz*sizeof(T) );
+        if( ptr ) std::memset( ptr, 0, sz*sizeof(T) );
     }
 
     __host__
     void release( )
     {
-        POP_CUDA_FREE_HOST( ptr );
-        ptr = 0;
+        if(ptr) {
+            POP_CUDA_FREE_HOST( ptr );
+            ptr = nullptr;
+        }
     }
 };
 
@@ -190,9 +199,10 @@ public:
     EdgeList( int pipeId, FrameMetaPtr& meta, FrameMetaEnum e )
         : _meta( meta )
         , _e( e )
+        , dev{nullptr}
         , host( pipeId )
     { }
-    ~EdgeList( ) { }
+    ~EdgeList( ) { release(); }
 
 #ifndef NDEBUG
     __host__
@@ -298,14 +308,9 @@ public:
     __host__
     void init( cudaStream_t stream )
     {
-        static bool hostInited = false;
         host.size = 0;
         copySizeToDevice( stream, EdgeListCont );
         dev .init( alloc_num, stream );
-        if (!hostInited) {
-          hostInited = true;
-          host.init( alloc_num );
-        }
     }
 
     __host__
@@ -317,7 +322,7 @@ public:
     __host__
     void release( )
     {
-        dev .release();
+        if(dev.ptr) dev.release();
         host.release();
     }
 #ifndef NDEBUG

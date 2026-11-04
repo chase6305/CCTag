@@ -18,10 +18,10 @@
 
 #include <cctag/utils/Math.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <vector>
-
-//#define NAIVE_SELECTCUT
 
 namespace cctag {
 class TagPipe;
@@ -36,52 +36,22 @@ enum NeighborType {
   CIRCULAR,
   COV
 };
-  
-/**
- * @brief Identify a marker:
- *   i) its imaged center is optimized: A. 1D image cuts are selected ; B. the optimization is performed 
- *   ii) the outer ellipse + the obtained imaged center delivers the image->cctag homography
- *   iii) the rectified 1D signals are read and deliver the ID via a nearest neighbour
- *        approach where the distance to the cctag bank's profiles used is the one described in [Orazio et al. 2011]
- * @param[in] tagIndex a sequence number assigned to this tag
- * @param[in] cctag whose center is to be optimized in conjunction with its associated homography.
- * @param[out] vSelectedCuts step 1 does nothing else than create cuts for this tag
- * @param[in] radiusRatios bank of radius ratios along with their associated IDs.
- * @param[in] src original gray scale image (original scale, uchar)
- * @param[in] params set of parameters
- * @return status of the markers (c.f. all the possible status are located in CCTag.hpp) 
- */
-int identify_step_1(
-    int tagIndex,
-	const CCTag & cctag,
-    std::vector<cctag::ImageCut>& vSelectedCuts,
-	// const std::vector< std::vector<float> > & radiusRatios,
-	const cv::Mat & src,
-    // cctag::TagPipe* pipe,
-	const cctag::Parameters & params);
 
-/**
- * @brief Identify a marker:
- *   i) its imaged center is optimized: A. 1D image cuts are selected ; B. the optimization is performed 
- *   ii) the outer ellipse + the obtained imaged center delivers the image->cctag homography
- *   iii) the rectified 1D signals are read and deliver the ID via a nearest neighbour
- *        approach where the distance to the cctag bank's profiles used is the one described in [Orazio et al. 2011]
- * @param[in] tagIndex a sequence number assigned to this tag
- * @param[in] cctag whose center is to be optimized in conjunction with its associated homography.
- * @param[in] vSelectedCuts pre-generated cuts
- * @param[in] radiusRatios bank of radius ratios along with their associated IDs.
- * @param[in] src original gray scale image (original scale, uchar)
- * @param[in] params set of parameters
- * @return status of the markers (c.f. all the possible status are located in CCTag.hpp) 
- */
-int identify_step_2(
-    int tagIndex,
-	CCTag & cctag,
-    std::vector<cctag::ImageCut>& vSelectedCuts,
-	const std::vector< std::vector<float> > & radiusRatios,
-	const cv::Mat & src,
-    cctag::TagPipe* cudaPipe,
-	const cctag::Parameters & params);
+/// Collect and select radial cuts from the original-scale grayscale image.
+/// Returns status::id_reliable when the cuts are ready for step 2; no ID or
+/// optimized geometry is assigned in this step. Other statuses describe failure.
+int identify_step_1(
+  int tagIndex, const CCTag& tag, std::vector<ImageCut>& selectedCuts, const cv::Mat& image, const Parameters& params);
+
+/// Refine the center and marker-to-image homography, then identify the rectified
+/// profiles against radiusRatios. Returns a marker status from CCTag.hpp.
+int identify_step_2(int tagIndex,
+                    CCTag& tag,
+                    std::vector<ImageCut>& selectedCuts,
+                    const std::vector<std::vector<float>>& radiusRatios,
+                    const cv::Mat& image,
+                    TagPipe* cudaPipe,
+                    const Parameters& params);
 
 using RadiusRatioBank = std::vector<std::vector<float>>;
 using CutSelectionVec =  std::vector< std::pair< cctag::Point2d<Eigen::Vector3f>, cctag::ImageCut>>;
@@ -109,28 +79,24 @@ inline void applyHomography(
   yRes = v/w;
 }
 
-/**
- * @brief Read and identify a 1D rectified image signal.
- * 
- * @param[out] vScore ordered set of the probability of the k nearest IDs
- * @param[in] rrBank Set of vector of radius ratio describing the 1D profile of the cctag library
- * @param[in] cuts image cuts holding the rectified 1D signal
- * @param[in] minIdentProba minimal probability to considered a cctag as correctly identified
- * @return true if the cctag has been correctly identified, false otherwise
- */
-bool orazioDistanceRobust(
-        std::vector<std::list<float> > & vScore,
-        const RadiusRatioBank & rrBank,
-        const std::vector<cctag::ImageCut> & cuts,
-        float minIdentProba);
+/// Append each readable cut's best matching probability to the corresponding ID.
+/// Cuts need more than 30 samples, finite statistics and both light and dark
+/// samples. Flat or invalid profiles contribute no votes. Equal probabilities
+/// select the last ID in the bank. The caller applies minIdentProba; this argument
+/// is retained for compatibility. Returns false for empty cuts or an empty bank.
+bool orazioDistanceRobust(std::vector<std::list<float>>& votesById,
+                          const RadiusRatioBank& radiusRatios,
+                          const std::vector<ImageCut>& cuts,
+                          float minIdentProba);
 
 /**
  * @brief Extract a rectified 1D signal along an image cut based on an homography.
- * 
+ *
  * @param[out] cut image cut holding the rectified image signal
  * @param[in] src source grayscale image (uchar)
- * @param[in] mHomography image->cctag homography
- * @param[in] mInvHomography cctag>image homography
+ * @param[in] mHomography cctag->image homography
+ * @param[in] mInvHomography image->cctag homography
+ * @note Fewer than two samples marks the cut as out of bounds.
  */
 void extractSignalUsingHomography(
         cctag::ImageCut & cut,
@@ -153,6 +119,7 @@ void extractSignalUsingHomographyDeprec(
  * @param[out] cut image cut that will hold the 1D image signal regularly 
  *             collected from cut.beginSig() to cut.endSig()
  * @param[in] src source gray scale image (uchar)
+ * @note Fewer than two samples marks the cut as out of bounds.
  */
 void cutInterpolated(
         cctag::ImageCut & cut,
@@ -162,6 +129,7 @@ void cutInterpolated(
 /// Throws std::invalid_argument when the image signal is empty.
 std::pair<float,float> convImageCut(const std::vector<float> & kernel, ImageCut & cut);
 
+/// Smooth with the legacy fixed kernel; sigma is retained for compatibility.
 void blurImageCut(float sigma, cctag::ImageCut & cut);
 
 bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, size_t numSamplesOuterEdgePointsRefinement);
@@ -176,54 +144,39 @@ bool outerEdgeRefinement(ImageCut & cut, const cv::Mat & src, float scale, size_
  * @param[in] nSamplesInCut number of samples collected in an image cut
  * @param[in] beginSig offset from which the signal must be collected (in [0 1])
  */
-void collectCuts(
-        std::vector<cctag::ImageCut> & cuts, 
-        const cv::Mat & src,
-        const cctag::Point2d<Eigen::Vector3f> & center,
-        const std::vector< cctag::DirectedPoint2d<Eigen::Vector3f> > & outerPoints,
-        std::size_t sampleCutLength,
-        std::size_t startOffset );
+void collectCuts(std::vector<cctag::ImageCut>& cuts,
+                 const cv::Mat& src,
+                 const cctag::Point2d<Eigen::Vector3f>& center,
+                 const std::vector<cctag::DirectedPoint2d<Eigen::Vector3f>>& outerPoints,
+                 std::size_t nSamplesInCut,
+                 float beginSig);
 
-/*
- * @brief Bilinear interpolation for a point whose coordinates are (x,y)
- * 
- * @param[in] src source gray scale image (uchar)
- * @param[in] x x coordinate
- * @param[in] y y coordinate
- * @return computed pixel value
- */
-inline float getPixelBilinear(const cv::Mat & src, float x, float y)
+/// Sample nonnegative image coordinates with a complete 2x2 neighbourhood.
+/// The signal convention uses half-scale grayscale intensity.
+inline float getPixelBilinear(const cv::Mat& src, float x, float y)
 {
-  int px = (int)x; // floor of x
-  int py = (int)y; // floor of y
-  const uchar* p0 = src.data + px + py * src.step; // pointer to first pixel
-  
-  // load the four neighboring pixels
-  const uchar & p1 = p0[0 + 0 * src.step];
-  const uchar & p2 = p0[1 + 0 * src.step];
-  const uchar & p3 = p0[0 + 1 * src.step];
-  const uchar & p4 = p0[1 + 1 * src.step];
-
-  // Calculate the weights for each pixel
-  float fx = x - px;
-  float fy = y - py;
-  float fx1 = 1.0f - fx;
-  float fy1 = 1.0f - fy;
-
-  float w1 = fx1 * fy1;
-  float w2 = fx  * fy1;
-  float w3 = fx1 * fy;
-  float w4 = fx  * fy;
-
-  // Calculate the weighted sum of pixels (for each color channel)
-  return (p1 * w1 + p2 * w2 + p3 * w3 + p4 * w4)/2;
+    const int pixelX = static_cast<int>(x);
+    const int pixelY = static_cast<int>(y);
+    const uchar* top = src.ptr<uchar>(pixelY) + pixelX;
+    const uchar* bottom = top + src.step;
+    const float fractionX = x - pixelX;
+    const float fractionY = y - pixelY;
+    const float inverseX = 1.f - fractionX;
+    const float inverseY = 1.f - fractionY;
+    const float topLeftWeight = inverseX * inverseY;
+    const float topRightWeight = fractionX * inverseY;
+    const float bottomLeftWeight = inverseX * fractionY;
+    const float bottomRightWeight = fractionX * fractionY;
+    return (top[0] * topLeftWeight + top[1] * topRightWeight + bottom[0] * bottomLeftWeight +
+            bottom[1] * bottomRightWeight) /
+           2;
 }
 
 /**
  * @brief Collect rectified 1D signals along image cuts.
- * 
+ *
  * @param[out] vCuts set of the image cuts whose the rectified signal is to be to computed
- * @param[in] mHomography transformation image->cctag used to rectified the 1D signal
+ * @param[in] mHomography transformation cctag->image used to sample the rectified signal
  * @param[in] src source gray scale image (uchar)
  */
 void getSignals(
@@ -232,18 +185,20 @@ void getSignals(
         const cv::Mat & src);
 
 /**
- * @brief Compute the optimal homography/imaged center based on the 
+ * @brief Compute the optimal homography/imaged center based on the
  * signal in the image and  the outer ellipse, supposed to be image the unit circle.
- * 
+ *
  * @param[in] tagIndex a sequence number for this tag
- * @param[out] mHomography image->cctag homography to optimize
- * @param[out] optimalPoint imaged center to optimize
- * @param[out] vCuts cuts holding the rectified 1D signals at the end of the optimization
+ * @param[out] mHomography cctag->image homography to optimize
+ * @param[in,out] optimalPoint initial imaged center, replaced by the optimized center
+ * @param[in,out] vCuts selected cuts, holding the rectified signals on success
  * @param[out] residual from the optimization (normalized w.r.t. binary pattern)
  * @param[in] src source image
  * @param[in] outerEllipse outer ellipse
  * @param[in] params parameters of the cctag algorithm
  * @return true if the optimization has found a solution, false otherwise.
+ * The CPU path evaluates the initial center when the search width is already
+ * below 0.02 pixels, including a zero neighbourhood size.
  */
 bool refineConicFamilyGlob(
         int tagIndex,
@@ -259,15 +214,14 @@ bool refineConicFamilyGlob(
 
 /**
  * @brief Convex optimization of the imaged center within a point's neighbourhood.
- * 
- * @param[out] mHomography optimal homography from the pixel plane to the cctag plane.
- * @param[out] vCuts vector of the image cuts whose the signal has been rectified w.r.t. the computed mHomography
+ *
+ * @param[out] mHomography optimal homography from the cctag plane to the pixel plane.
+ * @param[out] vCuts scratch signals from the last evaluated candidate; call
+ *                  getSignals with the returned homography to sample the optimum
  * @param[out] center optimal imaged center
  * @param[out] minRes residual after optimization
  * @param[in] neighbourSize size of the neighbourhood to consider relatively to the outer ellipse dimensions
- * @param[in] gridNSample number of sample points along one dimension of the neighbourhood (e.g. grid)
  * @param[in] src source gray (uchar) image
- * @param[inout] cudaPipe CUDA object handle, changing
  * @param[in] outerEllipse outer ellipse
  * @param[in] params Parameters read from config file
  */
@@ -281,18 +235,10 @@ bool imageCenterOptimizationGlob(
         const cctag::numerical::geometry::Ellipse & outerEllipse,
         const cctag::Parameters & params );
 
-
-/**
- * @brief Compute a set of point locations nearby a given center following
- * a given type of pattern (e.g. regularly sampled points over a grid)
- * 
- * @param[in] ellipse outer ellipse providing the absolute scale.
- * @param[in] center the center around which point locations are computed
- * @param[out] nearbyPoints computed 2D points
- * @param[in] neighbourSize provide the scale of the pattern relatively to the ellipse dimensions
- * @param[in] gridNSample number of sampled points along a dimension of the pattern
- * @param[in] neighborType type of pattern (e.g. a grid)
- */
+/// Replace nearbyPoints with a square GRID centered at center. neighbourSize
+/// sets its width relative to the largest ellipse semi-axis; gridNSample is the
+/// number of points per axis and must be at least two. Other patterns are not
+/// implemented and produce no points. Throws for invalid or overflowing sizes.
 void getNearbyPoints(
           const cctag::numerical::geometry::Ellipse & ellipse,
           const cctag::Point2d<Eigen::Vector3f> & center,
@@ -314,58 +260,30 @@ void computeHomographyFromEllipseAndImagedCenter(
         const cctag::Point2d<Eigen::Vector3f> & center,
         Eigen::Matrix3f & mHomography);
 
-/**
- * @brief Compute the residual of the optimization which is the average of the square of the 
- * differences between two rectified image signals/cuts over all possible cut-pair in a set 
- * of image cuts.
- * 
- * @param[in] mHomography transformation used to rectified the 1D signal from the pixel plane to the cctag plane.
- * @param[out] vCuts vector of the image cuts holding the rectified signal according to mHomography
- * @param[in] src source gray scale image (uchar)
- * @param[out] flag: true if at least one pair of image cuts is readable (within image bounds), false otherwise.
- * @return residual
- */
-float costFunctionGlob(
-        const Eigen::Matrix3f & mHomography,
-        std::vector< cctag::ImageCut > & vCuts,
-        const cv::Mat & src,
-        bool & flag);
+/// Resample the cuts and return summed squared sample differences, averaged
+/// over readable cut pairs. Readable cuts need equal sample counts.
+/// Set readable to false and return max<float> for mismatched sample counts
+/// or fewer than two readable cuts.
+float costFunctionGlob(const Eigen::Matrix3f& homography,
+                       std::vector<ImageCut>& cuts,
+                       const cv::Mat& image,
+                       bool& readable);
 
-
-/**
- * @brief COmpute a median value from a vector of scalar values
- * 
- * @param[vec] vec vector of scalar values
- * @return its associated median
- * @todo PERFORMANCE! take a pair of iterators, will avoid copying at the call site.
- */
+/// Compute the median without modifying the input; average the central pair
+/// for even sample counts. Throws std::invalid_argument for an empty input.
 template<typename VecT>
-typename VecT::value_type computeMedian( const VecT& vec )
+typename VecT::value_type computeMedian(const VecT& values)
 {
-  using T = typename VecT::value_type;
-  //BOOST_ASSERT( vec.size() > 0 );
+    using Value = typename VecT::value_type;
+    if(values.empty())
+        throw std::invalid_argument("computeMedian requires at least one sample");
 
-  const std::size_t s = (vec.size() / 2) + 1;
-  //std::cout << "s: " << s << std::endl;
-
-  std::vector<T> output( s );
-  // sort the first half of the data +1 element
-  std::partial_sort_copy( vec.begin(), vec.end(), output.begin(), output.end() );
-
-  const bool isOdd = vec.size() % 2; // impair todo@Lilian: change to bit operation
-
-  if( isOdd )
-  {
-    // if the size of input datas is odd,
-    // the median is the element at the center
-    // output contains half of the datas, so it's the last element.
-    return output.back();
-  }
-
-  // the size of the data is even, so the median is the mean of the
-  // 2 elements at the center.
-
-  return ( output[s-1] + output[s-2] ) / 2.0;
+    const std::size_t medianSize = values.size() / 2 + 1;
+    std::vector<Value> lowerHalf(medianSize);
+    std::partial_sort_copy(values.begin(), values.end(), lowerHalf.begin(), lowerHalf.end());
+    if(values.size() % 2)
+        return lowerHalf.back();
+    return (lowerHalf[medianSize - 1] + lowerHalf[medianSize - 2]) / 2.0;
 }
 
 inline float dis( const float sig, const float val, const float mub, const float muw, const float varSubS )

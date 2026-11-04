@@ -12,6 +12,10 @@
 #include <cctag/utils/Defines.hpp>
 
 #include <cstddef>
+#include <atomic>
+#include <cstdint>
+#include <limits>
+#include <new>
 #include <sys/types.h>
 #include <cmath>
 #include <iosfwd>
@@ -24,10 +28,12 @@ using Vector3s = Eigen::Matrix<short, 3, 1>;
 class EdgePoint : public Vector3s
 {
 public:
+  static constexpr std::size_t MAX_PROCESSED_RUNS = std::numeric_limits<std::uint64_t>::digits;
+
+  // Keep unused collection slots uninitialized.
   EdgePoint() = default;
 
-  // XXX: should delete copy ctor; a lot of state is in EdgePointCollection
-  // That class checks incoming pointers though.
+  // Copies retain geometry and start with fresh detection bookkeeping.
   EdgePoint( const EdgePoint& p )
     : Vector3s(p)
     , _grad( p._grad )
@@ -47,6 +53,22 @@ public:
     , _isMax( -1 )
     , _nSegmentOut(-1)
   {
+  }
+
+  EdgePoint& operator=(const EdgePoint& point)
+  {
+    if(this != &point)
+    {
+      Vector3s::operator=(point);
+      _grad = point._grad;
+      _normGrad = point._normGrad;
+      _flowLength = point._flowLength;
+      // Reconstruct the flag to also initialize a default-constructed destination.
+      new (&_processed) std::atomic<std::uint64_t>(point._processed.load(std::memory_order_relaxed));
+      _isMax = point._isMax;
+      _nSegmentOut = point._nSegmentOut;
+    }
+    return *this;
   }
 
   Eigen::Vector2f gradient() const
@@ -76,14 +98,12 @@ private:
   float _normGrad;
 public:
   float _flowLength;
-  uint64_t _processed;   // bitfield; must be 64-bit
+  std::atomic<std::uint64_t> _processed; // One visited bit per candidate run.
   int _isMax;
-  int _nSegmentOut;     // std::size_t _nSegmentOut;
+  int _nSegmentOut; // Outer-segment label; -1 means unassigned.
 };
 
-// Calculation: sizeof(Vector3s)==8 (3*2=6 + 2 bytes of padding to 8 bytes)
-// 4*sizeof(float) == 16; plus uint64_t + 2 ints
-static_assert(sizeof(EdgePoint) == 8+16+16, "EdgePoint not packed");
+static_assert(sizeof(EdgePoint) == 40, "EdgePoint host layout must remain 40 bytes");
 
 inline bool receivedMoreVoteThan(const EdgePoint * const p1,  const EdgePoint * const p2)
 {

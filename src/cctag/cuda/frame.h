@@ -9,6 +9,7 @@
 
 #include <cctag/cuda/cctag_cuda_runtime.h>
 #include <assert.h>
+#include <cstddef>
 #include <string>
 #include <vector>
 #include <opencv2/core/mat.hpp>
@@ -47,6 +48,8 @@
 #define GAUSS_DERIV 16 // first derivative
 
 namespace cctag {
+
+struct FrameParam;
 // namespace identification {
 // // locally defined in frame_ident.cu only
 // struct CutStruct;
@@ -104,8 +107,8 @@ public:
     // Copy manually created LUT tables for thinning
     static void initThinningTable( );
 
-    // copy the upper layer from the host to the device
-    void upload( const unsigned char* image ); // implicitly assumed that w/h are the same as above
+    // Upload this frame's dimensions; zero row stride means tightly packed pixels.
+    void upload( const unsigned char* image, std::size_t rowStride = 0 );
 
     // called by every thread, unpins uploaded image in frame 0
     void uploadComplete( );
@@ -160,7 +163,7 @@ public:
     void applyGaussDownload( );
 
     // implemented in frame_03_magmap.cu
-    void applyMag( );
+    void applyMag(const FrameParam& params);
 
     // implemented in frame_03_magmap.cu
     void applyMagDownload( );
@@ -173,10 +176,10 @@ public:
     void applyThinDownload( );
 
     // implemented in frame_06_graddesc.cu
-    bool applyDesc( );
+    bool applyDesc(const FrameParam& params);
 
     // implemented in frame_07a_vote_line.cu
-    bool applyVoteConstructLine( );
+    bool applyVoteConstructLine(const FrameParam& params);
 
     // implemented in frame_07b_vote_sort_uniq_dp.cu
     // implemented in frame_07b_vote_sort_uniq_nodp.cu
@@ -186,7 +189,7 @@ public:
     bool applyVoteEval( );
 
     // implemented in frame_07d_vote_if.cu
-    bool applyVoteIf( );
+    bool applyVoteIf(const FrameParam& params);
 
     // implemented in frame_07e_graddesc.cu
     void applyVoteDownload( );
@@ -267,6 +270,7 @@ private:
     FrameTexture*        _texture;
     cudaEvent_t          _wait_for_upload;
     const unsigned char* _image_to_upload;
+    std::size_t _image_to_upload_bytes{};
 
 public:
     // if we run out of streams (there are 32), we may have to share

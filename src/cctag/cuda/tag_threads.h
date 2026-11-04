@@ -7,105 +7,104 @@
  */
 #pragma once
 
-// #include <string>
-// #include <vector>
-// #include <stdlib.h>
-// #include <inttypes.h>
-// #include <opencv2/core.hpp>
-
-#include <thread>
-#include <mutex>
 #include <condition_variable>
 #include <cstddef>
-
-// #include "cctag/cuda/onoff.h"
-// #include "cctag/Params.hpp"
-// #include "cctag/Types.hpp"
-// #include "cctag/ImageCut.hpp"
-// #include "cctag/geometry/Ellipse.hpp"
-// #include "cctag/geometry/Point.hpp"
-// #include "cctag/algebra/matrix/Matrix.hpp"
-// #include "cctag/utils/LogTime.hpp"
+#include <exception>
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 namespace cctag
 {
 
-class TagPipe;
-class TagThreads;
-
-/*************************************************************
- * TagSemaphore
- *************************************************************/
 class TagSemaphore
 {
-    int                          _sema_val;
-    std::mutex                   _sema_mx;
-    std::condition_variable      _sema_cond;
 public:
-    TagSemaphore( int init )
-        : _sema_val( init )
-    { }
+    explicit TagSemaphore(int count) : _count(count) {}
 
-    void wait( int n = 1 );
-    void post( int n = 1 );
-};
+    void wait(int count = 1);
+    void post(int count = 1);
 
-class TagThread : public std::thread
-{
-    TagThreads* _creator;
-    TagPipe*    _pipe;
-    int         _my_layer;
-
-public:
-    TagThread( TagThreads* creator, TagPipe* pipe, int layer );
-
-    void call( void );
+private:
+    int _count;
+    std::mutex _mutex;
+    std::condition_variable _available;
 };
 
 class TagFrameGate
 {
-    std::size_t _generation{0};
-    std::mutex _mutex;
-    std::condition_variable _ready;
 public:
+    // Generation zero signals shutdown; frames start at generation one.
     std::size_t wait(std::size_t previous)
     {
         std::unique_lock<std::mutex> lock(_mutex);
-        _ready.wait(lock, [&] { return _generation != previous; });
-        return _generation;
+        _ready.wait(lock, [&] { return _stopped || _generation != previous; });
+        return _stopped ? 0 : _generation;
     }
 
     void post()
     {
         {
             std::lock_guard<std::mutex> lock(_mutex);
+            if(_stopped)
+                return;
             ++_generation;
         }
         _ready.notify_all();
     }
+
+    void stop()
+    {
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _stopped = true;
+        }
+        _ready.notify_all();
+    }
+
+    // Reset only after all workers from the previous run have joined.
+    void reset()
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _generation = 0;
+        _stopped = false;
+    }
+
+private:
+    std::size_t _generation = 0;
+    bool _stopped = false;
+    std::mutex _mutex;
+    std::condition_variable _ready;
 };
 
 class TagThreads
 {
-    TagPipe*         _pipe;
-    int              _layers;
-    TagSemaphore     _start;
-    TagFrameGate     _frameReady;
-    TagSemaphore     _frameDone;
 public:
-    TagThreads( );
+    // Call control methods from the pipeline owner, never from a layer callback.
+    TagThreads() = default;
+    ~TagThreads();
 
-    void init( TagPipe* pipe, int layers );
+    // Replace the workers; failed thread creation leaves the run stopped.
+    void init(int layers, std::function<void(int)> handleLayer);
 
-    void oneRound( );
+    // Each accepted round finishes every layer before returning or rethrowing.
+    void oneRound();
 
-    void startWait( );
-    void startPost( );
-    std::size_t frameReadyWait( std::size_t previous );
-    void frameReadyPost( );
-    void frameDoneWait( );
-    void frameDonePost( );
+    // Finish the current round and join workers. Safe to repeat; new rounds need init().
+    void stop();
+
+private:
+    void workerLoop(int layer);
+    void stopWorkers(); // Caller holds _roundMutex.
+
+    std::function<void(int)> _handleLayer;
+    std::vector<std::thread> _workers;
+    TagFrameGate _frameReady;
+    TagSemaphore _frameDone{0};
+    std::mutex _roundMutex;
+    std::mutex _errorMutex;
+    std::exception_ptr _failure;
 };
 
-}; // namespace cctag
-
+} // namespace cctag

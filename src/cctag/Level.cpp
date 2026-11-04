@@ -12,7 +12,11 @@
 #ifdef CCTAG_WITH_CUDA
 #include "cctag/cuda/tag.h"
 #endif
+#include <opencv2/imgproc.hpp>
 #include <opencv2/imgproc/types_c.h>
+
+#include <iostream>
+#include <memory>
 
 namespace cctag {
 
@@ -22,27 +26,32 @@ Level::Level( std::size_t width, std::size_t height, int debug_info_level, bool 
     , _mat_initialized_from_cuda( false )
     , _cols( width )
     , _rows( height )
+    , _dx(nullptr)
+    , _dy(nullptr)
+    , _mag(nullptr)
+    , _src(nullptr)
+    , _edges(nullptr)
 {
-    if( _cuda_allocates ) {
-        _src   = nullptr;
-        _dx    = nullptr;
-        _dy    = nullptr;
-        _mag   = nullptr;
-        _edges = nullptr;
-    } else {
-        // Allocation
-        _src   = new cv::Mat(height, width, CV_8UC1);
-        _dx    = new cv::Mat(height, width, CV_16SC1 );
-        _dy    = new cv::Mat(height, width, CV_16SC1 );
-        _mag   = new cv::Mat(height, width, CV_16SC1 );
-        _edges = new cv::Mat(height, width, CV_8UC1);
-    }
-    _temp = cv::Mat(height, width, CV_8UC1);
-  
+    if(!_cuda_allocates)
+    {
+        // Keep ownership local until every allocation has succeeded.
+        auto source = std::make_unique<cv::Mat>(height, width, CV_8UC1);
+        auto derivativeX = std::make_unique<cv::Mat>(height, width, CV_16SC1);
+        auto derivativeY = std::make_unique<cv::Mat>(height, width, CV_16SC1);
+        auto magnitude = std::make_unique<cv::Mat>(height, width, CV_16SC1);
+        auto edges = std::make_unique<cv::Mat>(height, width, CV_8UC1);
+        _temp.create(height, width, CV_8UC1);
+
 #ifdef CCTAG_EXTRA_LAYER_DEBUG
-  _edgesNotThin = cv::Mat(height, width, CV_8UC1);
+        _edgesNotThin.create(height, width, CV_8UC1);
 #endif
-  
+
+        _src = source.release();
+        _dx = derivativeX.release();
+        _dy = derivativeY.release();
+        _mag = magnitude.release();
+        _edges = edges.release();
+    }
 }
 
 Level::~Level( )
@@ -65,14 +74,11 @@ void Level::setLevel( const cv::Mat & src,
     }
 
     cv::resize( src, *_src, cv::Size(_src->cols,_src->rows) );
-    // ASSERT TODO : check that the data are allocated here
     // Compute derivative and canny edge extraction.
     cvRecodedCanny( *_src, *_edges, *_dx, *_dy,
                     thrLowCanny * 256, thrHighCanny * 256,
                     3 | CV_CANNY_L2_GRADIENT,
                     _level, params );
-    // Perform the thinning.
-
 #ifdef CCTAG_EXTRA_LAYER_DEBUG
     _edgesNotThin = _edges->clone();
 #endif
@@ -89,11 +95,23 @@ void Level::setLevel( cctag::TagPipe*         cuda_pipe,
         exit( -__LINE__ );
     }
 
-    _src   = cuda_pipe->getPlane( _level );
-    _dx    = cuda_pipe->getDx( _level );
-    _dy    = cuda_pipe->getDy( _level );
-    _mag   = cuda_pipe->getMag( _level );
-    _edges = cuda_pipe->getEdges( _level );
+    // The pipeline owns the pixels; Level owns the cv::Mat headers it returns.
+    std::unique_ptr<cv::Mat> source(cuda_pipe->getPlane(_level));
+    std::unique_ptr<cv::Mat> derivativeX(cuda_pipe->getDx(_level));
+    std::unique_ptr<cv::Mat> derivativeY(cuda_pipe->getDy(_level));
+    std::unique_ptr<cv::Mat> magnitude(cuda_pipe->getMag(_level));
+    std::unique_ptr<cv::Mat> edges(cuda_pipe->getEdges(_level));
+
+    delete _src;
+    delete _dx;
+    delete _dy;
+    delete _mag;
+    delete _edges;
+    _src = source.release();
+    _dx = derivativeX.release();
+    _dy = derivativeY.release();
+    _mag = magnitude.release();
+    _edges = edges.release();
 }
 #endif // CCTAG_WITH_CUDA
 

@@ -52,12 +52,6 @@ public:
 public:
 
   CCTag()
-    : _id(0)
-    , _quality(0)
-    , _status(0)
-#ifdef CCTAG_WITH_CUDA
-    , _cuda_result( nullptr )
-#endif
   {
     setInitRadius();
   }
@@ -70,40 +64,42 @@ public:
         int pyramidLevel,
         float scale,
         const float quality = 1.f)
-    : _centerImg(centerImg)
-    , _id(id)
+    : _id(id)
+    , _centerImg(centerImg)
     , _outerEllipse(outerEllipse)
     , _points(points)
     , _mHomography(homography)
     , _quality(quality)
     , _pyramidLevel(pyramidLevel)
     , _scale(scale)
-#ifdef CCTAG_WITH_CUDA
-    , _cuda_result( nullptr )
-#endif
   {
     setInitRadius();
+    // Before identification, the reconstructed point groups determine the count.
+    if(!_points.empty())
+        _nCircles = _points.size();
     _outerEllipse.setCenter( Point2d<Eigen::Vector3f>(_outerEllipse.center().x()+0.5f, _outerEllipse.center().y()+0.5f ) ); // todo@Lilian: + 0.5f
     cctag::numerical::geometry::scale(_outerEllipse, _rescaledOuterEllipse, scale);
-    
-    _status = 0;
   }
 
   CCTag(const CCTag & cctag)
-    : _centerImg(cctag._centerImg)
-    , _nCircles(cctag._nCircles)
+    : ICCTag(cctag)
     , _radiusRatios(cctag._radiusRatios)
+    , _nCircles(cctag._nCircles)
     , _id(cctag._id)
+    , _idSet(cctag._idSet)
+    , _centerImg(cctag._centerImg)
     , _outerEllipse(cctag._outerEllipse)
+    , _rescaledOuterEllipse(cctag._rescaledOuterEllipse)
+    , _rescaledOuterEllipsePoints(cctag._rescaledOuterEllipsePoints)
     , _ellipses(cctag._ellipses)
     , _points(cctag._points)
     , _mHomography(cctag._mHomography)
     , _quality(cctag._quality)
     , _pyramidLevel(cctag._pyramidLevel)
     , _scale(cctag._scale)
-    , _rescaledOuterEllipse(cctag._rescaledOuterEllipse)
     , _status(cctag._status)
 #ifdef CCTAG_WITH_CUDA
+    // A copied marker does not retain the pipeline's borrowed result buffer.
     , _cuda_result( nullptr )
 #endif
 #ifdef CCTAG_SERIALIZE
@@ -128,6 +124,7 @@ public:
     return _centerImg.y();
   }
   
+  // Number of circular boundaries, including the outermost circle.
   std::size_t nCircles() const
   {
     return _nCircles;
@@ -191,6 +188,7 @@ public:
   void setRadiusRatios(const std::vector<float>& radiusRatios)
   {
     _radiusRatios = radiusRatios;
+    _nCircles = _radiusRatios.size() + 1;
   }
 
   float quality() const
@@ -345,21 +343,16 @@ public:
 #endif
 
 #ifdef CCTAG_WITH_CUDA
-  /** Get a pointer to pinned memory for this tag.
-   *  It cannot be released for this tag.
-   *  Instead, releaseNearbyPointMemory() invalidates all such
-   *  pointers in the process.
-   */
+  // Borrow a result slot from this pipeline's pinned-memory pool.
+  // releaseNearbyPointMemory(pipeId) allows these slots to be reused.
   void acquireNearbyPointMemory( int pipeId );
 
   inline cctag::NearbyPoint* getNearbyPointBuffer( ) {
     return _cuda_result;
   }
 
-  /** Release all pinned memory associated with NearbyPoints.
-   *  Invalidates pointers in all objects and in all threads in
-   *  this process.
-   */
+  // Recycle one pipeline's result slots after identification completes.
+  // Previously borrowed pointers must not be used after this call.
   static void releaseNearbyPointMemory( int pipeId );
 #endif
 
@@ -379,25 +372,22 @@ protected:
   std::vector<float> _radiusRatios;
 
   std::size_t _nCircles;
-  MarkerID _id;
+  MarkerID _id{0};
   IdSet _idSet;
-  cctag::Point2d<Eigen::Vector3f> _centerImg;
+  cctag::Point2d<Eigen::Vector3f> _centerImg{0.f, 0.f};
   cctag::numerical::geometry::Ellipse _outerEllipse;
   cctag::numerical::geometry::Ellipse _rescaledOuterEllipse;
   std::vector< DirectedPoint2d<Eigen::Vector3f> > _rescaledOuterEllipsePoints;
   std::vector<cctag::numerical::geometry::Ellipse> _ellipses;
   std::vector< std::vector< DirectedPoint2d<Eigen::Vector3f> > > _points;
-  Eigen::Matrix3f _mHomography;
-  float _quality;
-  int    _pyramidLevel;
-  float _scale;
-  int    _status;
+  Eigen::Matrix3f _mHomography{Eigen::Matrix3f::Identity()};
+  float _quality{0.f};
+  int _pyramidLevel{0};
+  float _scale{1.f};
+  int _status{0};
 #ifdef CCTAG_WITH_CUDA
-  /** Pointer into pinned memory page.
-   *  Valid from the construction of the CCTag until identify()
-   *  is complete.
-   */
-  cctag::NearbyPoint* _cuda_result;
+  // Borrowed result storage; null until acquired for an identification pass.
+  cctag::NearbyPoint* _cuda_result{nullptr};
 #endif
 
 #ifdef CCTAG_SERIALIZE

@@ -11,13 +11,11 @@
 
 # Config file for CCTag.
 #
-# This file is used by CMake when find_package(CCTag) is invoked and either
-# the directory containing this file either is present in CMAKE_MODULE_PATH
-# (if CCTag was installed), or exists in the local CMake package registry if
-# the CCTag build directory was exported.
+# find_package(CCTag CONFIG) locates this file through CCTag_DIR,
+# CMAKE_PREFIX_PATH, or the local CMake package registry.
 #
 # This module defines a namespace CCTag:: and the target needed to compile and
-# link against the library. The target automatically propagate the dependencies
+# link against the library. The target automatically propagates the dependencies
 # of the library.
 #
 # In your CMakeLists.txt  file just add the dependency
@@ -37,11 +35,11 @@
 ################################################################################
 
 
-@PACKAGE_INIT@.
+@PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
 
-set(OpenCV_DIR @OpenCV_DIR@)
+set(OpenCV_DIR "@OpenCV_DIR@")
 find_dependency(OpenCV @OPENCV_VERSION@)
 find_dependency(TBB @TBB_VERSION@)
 find_dependency(Eigen3)

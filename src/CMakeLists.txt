@@ -95,7 +95,8 @@ if(CCTAG_WITH_CUDA)
 
   set(CUDA_cpp
         ./cctag/cuda/debug_macros.cpp
-        ./cctag/cuda/device_prop.cpp)
+        ./cctag/cuda/device_prop.cpp
+        ./cctag/cuda/tag_threads.cpp)
 
   set(CUDA_cu
         ./cctag/cuda/assist.cu
@@ -128,7 +129,6 @@ if(CCTAG_WITH_CUDA)
         ./cctag/cuda/recursive_sweep.cu
         ./cctag/cuda/tag.cu
         ./cctag/cuda/tag_identify.cu
-        ./cctag/cuda/tag_threads.cu
         ./cctag/cuda/triple_point.cu)
 
   set(CUDA_HEADERS
